@@ -1,0 +1,17 @@
+# macOS files
+.DS_Store
+
+# Claude local settings
+.claude/
+
+# Graphify temporary and local files
+graphify-out/cache/
+graphify-out/.graphify_*
+
+# Editor settings
+.vscode/
+.idea/
+
+# Temporary files
+*.log
+*.tmp
