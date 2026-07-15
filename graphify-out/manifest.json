@@ -1,0 +1,32 @@
+{
+  ".claude/settings.local.json": {
+    "mtime": 1783804025.219436,
+    "ast_hash": "5810bd35a97d6a544ccd1ef8efcccf73",
+    "semantic_hash": "5810bd35a97d6a544ccd1ef8efcccf73"
+  },
+  "app.js": {
+    "mtime": 1783806352.7164657,
+    "ast_hash": "d7b82edb4079e61f3b6a2652a4713a49",
+    "semantic_hash": "d7b82edb4079e61f3b6a2652a4713a49"
+  },
+  "README.md": {
+    "mtime": 1783805324.9989116,
+    "ast_hash": "0ec53a9b9dc3d7e52bb4e0352f41b89b",
+    "semantic_hash": "0ec53a9b9dc3d7e52bb4e0352f41b89b"
+  },
+  "index.html": {
+    "mtime": 1783806359.011735,
+    "ast_hash": "06ecc63d4ef9b88021974288f6d5c1f2",
+    "semantic_hash": "06ecc63d4ef9b88021974288f6d5c1f2"
+  },
+  "research/01_alzheimers_neuroplasticity_paper.md": {
+    "mtime": 1783804482.749842,
+    "ast_hash": "af51de3e4a1cb0a18588b0d2b532964a",
+    "semantic_hash": "af51de3e4a1cb0a18588b0d2b532964a"
+  },
+  "research/02_chronic_illness_neuroplasticity_paper.md": {
+    "mtime": 1783804526.662339,
+    "ast_hash": "dc056ea8e119f9a281c6a7d6ac07f85e",
+    "semantic_hash": "dc056ea8e119f9a281c6a7d6ac07f85e"
+  }
+}

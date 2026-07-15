@@ -1,0 +1,473 @@
+<meta charset="utf-8">
+<title>Neuroplasticity Exploration Simulator</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="styles.css">
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-brain" viewBox="0 0 18 18"><circle cx="9" cy="9" r="6.2"/><path d="M4.6 9c.9-2.1 1.8 2.1 2.7 0s1.8-2.1 2.7 0 1.8 2.1 2.7 0"/></symbol>
+  <symbol id="i-helix" viewBox="0 0 18 18"><path d="M5 2.5c0 3 4 3 4 6.5s-4 3.5-4 6.5"/><path d="M13 2.5c0 3-4 3-4 6.5s4 3.5 4 6.5"/><path d="M5.5 5.2h7M5 9h8M5.5 12.8h7"/></symbol>
+  <symbol id="i-microscope" viewBox="0 0 18 18"><circle cx="9" cy="4.6" r="2"/><path d="M9 6.6v3.4"/><path d="M6 15.5h6"/><path d="M9 10 6 15.5M9 10l3 5.5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 18 18"><path d="M5.2 2.6h5l2.2 2.2v10.2H5.2z"/><path d="M10.2 2.6v2.2h2.2"/><path d="M7 9.2h4M7 11.7h4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 18 18"><path d="M9 2.2 14.5 4v4.4c0 4-2.4 6.8-5.5 7.9-3.1-1.1-5.5-3.9-5.5-7.9V4z"/><path d="M6.6 9 8.3 10.7 11.6 7"/></symbol>
+  <symbol id="i-droplet" viewBox="0 0 18 18"><path d="M9 3c2.6 3.4 4.2 5.9 4.2 8.2A4.2 4.2 0 1 1 4.8 11.2C4.8 8.9 6.4 6.4 9 3z"/></symbol>
+  <symbol id="i-pulse" viewBox="0 0 18 18"><path d="M2 9.5h2.8l1.3-3.6 2.2 7.2 1.4-5.1 1 1.5h5.3"/></symbol>
+  <symbol id="i-nodes" viewBox="0 0 18 18"><circle cx="5.3" cy="5.8" r="2"/><circle cx="12.7" cy="12.2" r="2"/><path d="M6.8 7.3l4.4 3.4"/></symbol>
+  <symbol id="i-breath" viewBox="0 0 18 18"><path d="M9 2.8v3"/><path d="M4.6 9.3a4.4 4.4 0 0 1 8.8 0"/><path d="M2.5 14.6c1.6-2 4-3 6.5-3s4.9 1 6.5 3"/></symbol>
+  <symbol id="i-search" viewBox="0 0 18 18"><circle cx="7.2" cy="7.2" r="4.2"/><path d="M10.4 10.4 15 15"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 18 18"><path d="M3 9h11M9.5 4.5 14 9l-4.5 4.5"/></symbol>
+</svg>
+
+<div class="intro" id="intro">
+  <div class="intro-aurora" aria-hidden="true"></div>
+  <svg class="intro-brain" viewBox="0 0 480 360" fill="none" aria-hidden="true">
+    <g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M96 232C58 214 52 168 78 142C74 112 104 92 134 100C150 74 196 66 220 88C252 70 300 78 314 110C356 108 388 140 380 178C398 200 392 236 360 246C352 276 312 288 286 272C262 292 214 292 196 270C160 284 116 268 108 240C104 238 100 236 96 232Z"/>
+      <path d="M120 150C140 138 150 160 168 150S196 138 210 152"/>
+      <path d="M132 186C154 174 166 196 186 186S214 176 232 190"/>
+      <path d="M150 220C172 210 186 230 208 220S244 212 262 224"/>
+      <path d="M236 132C256 122 268 144 288 134S320 128 332 146"/>
+      <path d="M250 176C272 166 286 186 306 176S338 172 350 188"/>
+      <path d="M214 96C210 140 224 176 214 214C210 240 220 256 226 268"/>
+      <path d="M330 250C360 244 388 258 392 282C394 306 372 322 344 320C322 318 306 300 310 278C312 264 320 254 330 250Z"/>
+      <path d="M322 268C344 266 372 270 388 278M320 284C344 282 372 288 388 294M326 300C346 300 368 304 382 308"/>
+      <path d="M300 300C304 320 300 340 288 352"/>
+    </g>
+  </svg>
+  <canvas id="neuralCanvas" aria-hidden="true"></canvas>
+  <div class="intro-terms" id="introTerms" aria-hidden="true"></div>
+  <div class="intro-vignette" aria-hidden="true"></div>
+  <div class="intro-content">
+    <span class="intro-eyebrow">Neuroplasticity · a living science</span>
+    <h1 class="intro-title">The brain is not fixed.<br><em>It rewires itself.</em></h1>
+    <p class="intro-lead">For most of history we believed the adult brain was set in stone, its wiring permanent, its damage forever. It isn't. <b>Neuroplasticity</b> is the living proof that the brain reshapes itself through the choices we make every day: how we move, what we eat, how we think, how we heal.</p>
+    <p class="intro-disclaimer">Every projection inside is a teaching model, not a prediction. Coefficients are calibrated to real published research (cited in Science &amp; Model Notes) but are not validated against real patients. Built to spark scientific curiosity, not to forecast your own biology.</p>
+    <div class="intro-name">Neuroplasticity Exploration Simulator</div>
+    <p class="intro-sub">This is that science made touchable, dissect a living brain, flip a single gene, and watch two years of a life unfold under your own experiments. I built it because a wonder this profound shouldn't stay locked inside research papers. Come test it yourself.</p>
+    <button class="btn-glass" id="introStart"><span>Enter the lab</span><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+    <div class="intro-modules" aria-hidden="true">
+      <span>Dissect a living brain</span>
+      <span>Decode the APOE gene</span>
+      <span>Rewire a dying circuit</span>
+    </div>
+    <div class="intro-attrib">Made by a high school student, inspired by two of my own research papers on neuroplasticity.</div>
+    <div class="intro-legal-links"><a href="#" id="introPrivacyLink">Privacy Policy</a> · <a href="#" id="introTermsLink">Terms of Use</a></div>
+  </div>
+</div>
+
+<header>
+  <div class="title">
+    <h1>Neuroplasticity Exploration Simulator</h1>
+    <span class="tag">Neuroplasticity · APOE · Early-stage AD</span>
+    <span class="tag warn">Educational model, not clinical advice</span>
+  </div>
+  <p class="sub">Interactive companion to two research papers on enhancing neuroplasticity via omega-3, aerobic exercise, cognitive stimulation therapy &amp; meditation, and the genetics of the APOE4 risk allele. All directions of effect verified against the literature; magnitudes are illustrative and tunable.</p>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="sim" class="active" title="Dissectible brain + 24-month intervention model"><svg class="icon"><use href="#i-brain"/></svg>Intervention Simulator</button>
+  <button data-tab="apoe" title="3D DNA/protein model of the APOE4 Alzheimer's risk gene"><svg class="icon"><use href="#i-helix"/></svg>APOE Genetics Explorer</button>
+  <button data-tab="path" title="Parkinson's dopamine circuit + molecular Alzheimer's close-up"><svg class="icon"><use href="#i-microscope"/></svg>Pathology Lab</button>
+  <button data-tab="sci" title="How the model works, sourcing, and citations"><svg class="icon"><use href="#i-doc"/></svg>Science &amp; Model Notes</button>
+  <button data-tab="legal" title="Privacy Policy and Terms of Use"><svg class="icon"><use href="#i-shield"/></svg>Privacy &amp; Terms</button>
+</nav>
+
+<main>
+  <!-- ================= SIMULATOR ================= -->
+  <section class="tabpane active" id="tab-sim">
+    <div class="split">
+      <div>
+        <div class="card">
+          <h3><span class="dot"></span>Living brain, 24-month projection</h3>
+          <p class="hint">Default trajectory: <b>untreated early-stage Alzheimer's</b> (hippocampal atrophy, amyloid plaque, cognition decline). This is what your intervention sliders act on. Check <b>Parkinson's mode</b> below to additionally layer in substantia nigra dopamine decline. Drag to rotate · scroll to zoom. Use <b>X-ray cortex</b> + <b>Cross-section</b> to dissect inward and reveal the thalamus, basal ganglia, substantia nigra, ventricles, corpus callosum &amp; hippocampus. Everything reacts live to your interventions and the month scrubber.</p>
+          <div class="viewport" id="brainVP">
+            <div class="vp-tag">Left lateral view · sagittal</div>
+            <div class="vp-tag tr" id="brainMonthTag">Month 0</div>
+          </div>
+          <div class="vpctl">
+            <label title="Fade the cortex to translucent to see structures underneath">X-ray cortex <input type="range" id="ghost" min="15" max="100" value="100"></label>
+            <label title="Slice the brain open with a clipping plane">Cross-section <input type="range" id="dissect" min="0" max="100" value="100"></label>
+            <div class="seg" id="sectSeg">
+              <button data-sect="sagittal" class="active" title="Side-on view, dividing left/right">Sagittal</button>
+              <button data-sect="coronal" title="Front-on view, dividing front/back">Coronal</button>
+              <button data-sect="axial" title="Top-down view, dividing top/bottom">Axial</button>
+            </div>
+            <label class="toggle" title="Layers substantia nigra dopamine decline on top of the default Alzheimer's trajectory"><input type="checkbox" id="pdMode"> Parkinson's mode (off by default, adds dopamine decline)</label>
+            <button class="btn" id="brainReset" style="padding:5px 12px" title="Reset X-ray, cross-section & camera to defaults">Reset</button>
+            <button class="btn" id="brainExport" style="padding:5px 12px" title="Save current 3D view as an image">⤓ PNG</button>
+          </div>
+          <div class="legend">
+            <span><i style="background:#d7a595"></i>Cortex</span>
+            <span><i style="background:#c77b5e"></i>Hippocampus (memory)</span>
+            <span><i style="background:#bf3b2b"></i>Amyloid-β plaques</span>
+            <span><i style="background:#9ccf6a"></i>New neurons (neurogenesis)</span>
+            <span><i style="background:#cc3333"></i>Cerebral blood flow</span>
+            <span><i style="background:#2c1a10"></i>Substantia nigra (dopamine)</span>
+          </div>
+          <div class="infoblk" id="brainInspect" style="margin-top:8px"><span style="color:var(--dim2)"><svg class="icon"><use href="#i-search"/></svg> Click any structure to inspect it, dissect first (X-ray + Cross-section) to reach the interior.</span></div>
+        </div>
+
+        <div class="card">
+          <h3><span class="dot"></span>Trajectories vs. no-intervention baseline</h3>
+          <p class="hint">Solid = your plan · dashed = untreated early AD. Toggle series below.</p>
+          <canvas class="chart" id="chart" width="900" height="190"></canvas>
+          <div class="legend" id="chartLegend"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h3><span class="dot"></span>Interventions</h3>
+          <p class="hint">Weekly "dose" of each lifestyle treatment (0 = none, 100 = maximal adherence).</p>
+          <div class="ctrl">
+            <label><span class="lab"><svg class="icon"><use href="#i-droplet"/></svg>Omega-3 (DHA/EPA) diet</span><span class="val" id="vO3">60%</span></label>
+            <input type="range" id="o3" min="0" max="100" value="60">
+            <div class="desc">↑ BDNF · ↑ neurogenesis/synaptogenesis · ↓ neuroinflammation &amp; oxidative stress · membrane integrity.</div>
+          </div>
+          <div class="ctrl">
+            <label><span class="lab"><svg class="icon"><use href="#i-pulse"/></svg>Aerobic exercise</span><span class="val" id="vEx">60%</span></label>
+            <input type="range" id="ex" min="0" max="100" value="60">
+            <div class="desc">Strongest BDNF &amp; vascular driver · ↑ cerebral blood flow/VEGF · ↑ hippocampal volume.</div>
+          </div>
+          <div class="ctrl">
+            <label><span class="lab"><svg class="icon"><use href="#i-nodes"/></svg>Cognitive stimulation therapy</span><span class="val" id="vCst">60%</span></label>
+            <input type="range" id="cst" min="0" max="100" value="60">
+            <div class="desc">Direct ↑ cognition/executive function &amp; functional connectivity · weaker molecular effect.</div>
+          </div>
+          <div class="ctrl">
+            <label><span class="lab"><svg class="icon"><use href="#i-breath"/></svg>Meditation / calm mind</span><span class="val" id="vMed">30%</span></label>
+            <input type="range" id="med" min="0" max="100" value="30">
+            <div class="desc">↓ stress/inflammation · supports dopamine &amp; connectivity (2nd paper).</div>
+          </div>
+          <div class="ctrl">
+            <label><span class="lab"><svg class="icon"><use href="#i-helix"/></svg>APOE4 copies (genetic risk)</span><span class="val" id="vApoe">1</span></label>
+            <input type="range" id="apoe" min="0" max="2" value="1" step="1">
+            <div class="desc">0 = none · 1 = ~2–3× AD risk · 2 = ~8–12× risk. Raises plaque growth &amp; atrophy.</div>
+          </div>
+          <div class="row" style="margin-top:6px">
+            <button class="btn" data-preset="none" title="Set every intervention to 0%">Untreated</button>
+            <button class="btn" data-preset="single" title="Aerobic exercise only, others at 0%">Exercise only</button>
+            <button class="btn primary" data-preset="synergy" title="All four interventions high, shows the synergy hypothesis">Full synergy</button>
+            <button class="btn reset" id="simReset" title="Reset all sliders to defaults">↺ Reset</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><span class="dot"></span>Month <span id="monthLbl" class="mono">0</span> / 24 &nbsp; <button class="btn" id="play" style="padding:4px 12px" title="Auto-advance the month scrubber">▶ Play</button></h3>
+          <input type="range" id="month" min="0" max="24" value="0" style="margin:6px 0 12px" title="Scrub through the 24-month trajectory">
+          <div class="gauges" id="gauges"></div>
+        </div>
+
+        <div class="card">
+          <h3><span class="dot"></span>Synergy term (this study's hypothesis)</h3>
+          <p class="hint">Combining treatments adds more than the sum of parts. This is the cross-product bonus your paper argues is under-researched, no dedicated interaction-effect study exists to confirm it (see Science &amp; Model Notes).</p>
+          <div class="g">
+            <div class="gt"><b>Synergy bonus to neuroplasticity</b><span class="gv" id="synVal">0</span></div>
+            <div class="bar"><i id="synBar" style="width:0%;background:var(--accent)"></i></div>
+          </div>
+          <label class="toggle" style="margin-top:10px" title="Toggle the cross-product synergy bonus on/off"><input type="checkbox" id="synOn" checked> Enable synergy interactions</label>
+          <details>
+            <summary title="Edit the literature-derived model weights directly">Tune model coefficients</summary>
+            <table class="wt" id="coefTbl"></table>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= APOE EXPLORER ================= -->
+  <section class="tabpane" id="tab-apoe">
+    <div class="split">
+      <div>
+        <div class="card">
+          <h3><span class="dot"></span>APOE gene &amp; ApoE protein, 3D</h3>
+          <p class="hint">Drag to rotate · scroll to zoom. Switch the view between the DNA (defining SNPs) and the folded protein (the pathogenic domain interaction).</p>
+          <div class="row" style="margin-bottom:10px">
+            <div class="seg" id="viewSeg">
+              <button data-view="dna" class="active" title="The double helix and its two defining SNPs">DNA / SNPs</button>
+              <button data-view="protein" title="The folded ApoE protein and its domain interaction">ApoE protein</button>
+            </div>
+            <button class="btn" id="apoeExport" style="padding:6px 12px" title="Save current 3D view as an image">⤓ PNG</button>
+          </div>
+          <div class="viewport" id="geneVP">
+            <div class="vp-tag" id="geneTag">Double helix · codons 112 &amp; 158</div>
+            <div class="vp-tag tr" id="isoTag">Isoform ε3</div>
+          </div>
+          <div class="legend" id="geneLegend"></div>
+          <div class="infoblk" id="apoeInspect" style="margin-top:8px"><span style="color:var(--dim2)"><svg class="icon"><use href="#i-search"/></svg> Click any base, residue, or domain to inspect it.</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h3><span class="dot"></span>Genotype</h3>
+          <p class="hint">Pick the isoform, the two SNPs and residues 112/158 update in the 3D view.</p>
+          <div class="seg iso" id="isoSeg">
+            <button data-iso="2" title="Cys112/Cys158, associated with lower Alzheimer's risk">ε2 (protective)</button>
+            <button data-iso="3" class="active" title="Cys112/Arg158, the most common allele, average risk">ε3 (common)</button>
+            <button data-iso="4" title="Arg112/Arg158, the main genetic risk factor for late-onset Alzheimer's">ε4 (risk)</button>
+          </div>
+          <table class="wt" style="margin-top:12px" id="snpTbl"></table>
+          <div class="row" style="margin-top:10px"><button class="btn reset" id="apoeReset" title="Reset to ε3, DNA view, corrector off">↺ Reset view</button></div>
+        </div>
+
+        <div class="card" id="proteinCard">
+          <h3><span class="dot"></span>Structure corrector</h3>
+          <p class="hint">In ApoE4, Arg112 repositions Arg61 to form a salt bridge with Glu255, the "domain interaction" that makes ApoE4 pathogenic. A small-molecule corrector (e.g. PH002) breaks this bond so ApoE4 behaves like ApoE3. This is the removable pathogenic part your prompt asked to find.</p>
+          <label class="toggle" title="Simulates a PH002-type small molecule breaking the ApoE4 salt bridge"><input type="checkbox" id="fixOn"> Apply structure corrector (break Arg61–Glu255)</label>
+          <div id="fixState" class="infoblk" style="margin-top:10px"></div>
+        </div>
+
+        <div class="card">
+          <h3><span class="dot"></span>What this isoform does</h3>
+          <div class="infoblk" id="isoInfo"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PATHOLOGY LAB ================= -->
+  <section class="tabpane" id="tab-path">
+    <div class="split">
+      <div>
+        <div class="card">
+          <h3><span class="dot"></span>Pathology Lab, Parkinson's dopamine circuit &amp; molecular AD</h3>
+          <p class="hint">Drag to rotate · scroll to zoom. Switch between the nigrostriatal dopamine circuit and the molecular plaque/tangle close-up.</p>
+          <div class="row" style="margin-bottom:10px">
+            <div class="seg" id="pathSeg">
+              <button data-pview="park" class="active" title="Nigrostriatal dopamine pathway close-up">Substantia nigra (Parkinson's)</button>
+              <button data-pview="mol" title="Neuron-level amyloid-β &amp; tau close-up">Plaques &amp; tangles (Alzheimer's)</button>
+            </div>
+            <button class="btn reset" id="pathReset" title="Reset sliders and view">↺ Reset</button>
+            <button class="btn" id="pathExport" title="Save PNG">⤓ PNG</button>
+          </div>
+          <div class="viewport" id="pathVP">
+            <div class="vp-tag" id="pathTag">Nigrostriatal dopamine pathway</div>
+            <div class="vp-tag tr" id="pathState"></div>
+          </div>
+          <div class="legend" id="pathLegend"></div>
+          <div class="infoblk" id="pathInspect" style="margin-top:8px"><span style="color:var(--dim2)"><svg class="icon"><use href="#i-search"/></svg> Click a structure to inspect it.</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="card" id="parkCtl">
+          <h3><span class="dot"></span>Parkinson's, nigrostriatal dopamine</h3>
+          <p class="hint">Substantia nigra dopaminergic neurons die → dopamine falls → tremor &amp; rigidity. Aerobic exercise &amp; meditation partly restore dopamine and slow decline (2nd paper: John Pepper).</p>
+          <div class="ctrl"><label>Substantia nigra neuron loss <span class="val" id="vLoss">55%</span></label><input type="range" id="loss" min="0" max="90" value="55"><div class="desc">Progressive nigral degeneration, the core PD lesion. ~60–80% lost before motor symptoms appear.</div></div>
+          <div class="ctrl"><label>Aerobic exercise + meditation <span class="val" id="vRescue">40%</span></label><input type="range" id="rescue" min="0" max="100" value="40"><div class="desc">↑ dopamine, ↑ BDNF, delays motor progression.</div></div>
+          <div class="gauges" id="parkGauges"></div>
+        </div>
+        <div class="card" id="molCtl" style="display:none">
+          <h3><span class="dot"></span>Molecular AD, plaques &amp; tangles</h3>
+          <p class="hint">Extracellular amyloid-β fibrils clump into senile plaques; intracellular tau detaches from microtubules into neurofibrillary tangles, collapsing transport.</p>
+          <div class="ctrl"><label>Plaque + tau burden <span class="val" id="vBurden">60%</span></label><input type="range" id="burden" min="0" max="100" value="60"><div class="desc">Higher = more Aβ fibrils, more tangles, destabilized microtubules.</div></div>
+          <div class="ctrl"><label>Clearance (omega-3 + exercise + anti-amyloid) <span class="val" id="vClear">30%</span></label><input type="range" id="clear" min="0" max="100" value="30"><div class="desc">Reduces amyloid load, tau, and oxidative stress.</div></div>
+          <div class="gauges" id="molGauges"></div>
+        </div>
+        <div class="card"><h3><span class="dot"></span>What you're looking at</h3><div class="infoblk" id="pathInfo"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCIENCE NOTES ================= -->
+  <section class="tabpane" id="tab-sci">
+    <div class="card prose" id="sciProse"></div>
+  </section>
+
+  <!-- ================= PRIVACY & TERMS ================= -->
+  <section class="tabpane" id="tab-legal">
+    <div class="card prose" id="legalPrivacy">
+      <h2>Privacy Policy</h2>
+      <p class="note">This simulator does not collect, store, transmit, or sell any personal data.</p>
+      <ul>
+        <li><b>No user accounts.</b> Nothing to sign up for, nothing tied to your identity.</li>
+        <li><b>No cookies.</b> This site sets none.</li>
+        <li><b>No analytics or tracking.</b> No usage data is gathered, now or planned. If that ever changes, this policy will be updated first and disclosed here clearly.</li>
+        <li><b>Runs entirely locally in your browser.</b> Once the page loads, the 3D models, the simulation, and your slider settings all run on your device. Nothing is sent to a server.</li>
+        <li><b>External links.</b> The Science &amp; Model Notes tab links to outside sources (PubMed, NIH, journal publishers, university research centers). Those sites have their own privacy practices, not covered by this policy.</li>
+      </ul>
+    </div>
+
+    <div class="card prose" id="legalTerms">
+      <h2>Terms of Use</h2>
+      <p class="note">This is a student-built educational project. These terms aim to set clear, honest expectations for anyone using it, not to replace formal legal counsel.</p>
+      <p>By using the Neuroplasticity Exploration Simulator ("this simulator"), you agree to the following.</p>
+      <h3>1. Educational purpose only</h3>
+      <p>This simulator is a teaching and hypothesis-exploration tool built to accompany two research papers on neuroplasticity. It is not medical advice, not a diagnostic tool, and not a substitute for consultation with a qualified healthcare professional. Do not use it to make health, treatment, or medication decisions.</p>
+      <h3>2. No warranty</h3>
+      <p>This simulator is provided "as is," without warranty of any kind, express or implied. Model coefficients are calibrated against published research where possible but remain illustrative, not clinically validated. See Science &amp; Model Notes for full sourcing, effect sizes, and known limitations.</p>
+      <h3>3. Limitation of liability</h3>
+      <p>To the fullest extent permitted by law, the creator of this simulator is not liable for any damages or losses arising from use of, or reliance on, this simulator or its content.</p>
+      <h3>4. Third-party content</h3>
+      <p>External citations and links (PubMed, NIH, journal publishers, university research centers) point to third-party sources not controlled by this project. Their accuracy and availability are not guaranteed.</p>
+      <h3>5. Intellectual property</h3>
+      <p>The two source research papers, the simulation code, and the 3D models are the original work of the creator, made available here for educational viewing.</p>
+      <h3>6. No accounts, no personal data</h3>
+      <p>This tool collects no personal data. See the Privacy Policy above.</p>
+      <h3>7. Changes to these terms</h3>
+      <p>These terms may be updated as the project evolves. Continued use after a change means you accept the updated terms.</p>
+      <h3>8. Audience</h3>
+      <p>Built for anyone curious about neuroscience, including students. The "not medical advice" clause above applies to everyone, regardless of age.</p>
+    </div>
+  </section>
+</main>
+
+<!-- Landing: living nervous system (neurons w/ dendrites, axonal action potentials) + bouncing 3D terms. Self-contained, halts when intro closes. -->
+<script>
+(function(){
+  var canvas = document.getElementById('neuralCanvas'), intro = document.getElementById('intro'), termHost = document.getElementById('introTerms');
+  if(!canvas || !intro) return;
+  var ctx = canvas.getContext('2d');
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var W=0, H=0, DPR=1, nodes=[], edges=[], pulses=[], terms=[], raf=0, frame=0, maxD=1;
+
+  // cool desaturated teal palette
+  var LINE='rgba(127,179,176,', SOMA='rgba(167,207,202,', GLOW='rgba(140,200,196,', CORE='rgba(224,244,242,';
+
+  function rand(a,b){ return a+Math.random()*(b-a); }
+
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    if(!W||!H) return;
+    canvas.width = W*DPR|0; canvas.height = H*DPR|0;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    build(); layoutTerms();
+  }
+  function build(){
+    var n = Math.max(26, Math.min(72, Math.floor(W*H/20000)));
+    maxD = Math.min(W,H)*0.15 + 96;
+    nodes = [];
+    for(var i=0;i<n;i++){
+      var dendrites=[], dn=3+(Math.random()*3|0);
+      for(var k=0;k<dn;k++) dendrites.push({ang:Math.random()*6.2832, len:5+Math.random()*9});
+      nodes.push({ x:Math.random()*W, y:Math.random()*H,
+        vx:rand(-.12,.12), vy:rand(-.12,.12),
+        r:1.2+Math.random()*2.2, flash:0, dendrites:dendrites });
+    }
+    edges = [];
+    for(var a=0;a<nodes.length;a++) for(var b=a+1;b<nodes.length;b++){
+      var dx=nodes[a].x-nodes[b].x, dy=nodes[a].y-nodes[b].y;
+      if(dx*dx+dy*dy < maxD*maxD) edges.push({a:a,b:b});
+    }
+    pulses = [];
+  }
+  function spawnPulse(){
+    if(edges.length && pulses.length < 30){
+      var e = edges[(Math.random()*edges.length)|0];
+      pulses.push({ e:e, t:0, sp:0.005+Math.random()*0.011, dir:Math.random()<.5 });
+    }
+  }
+  function tick(){
+    frame++;
+    ctx.clearRect(0,0,W,H);
+    var i, n, e, a, b, dx, dy, d, al, k, dd;
+    for(i=0;i<nodes.length;i++){ n=nodes[i];
+      n.x+=n.vx; n.y+=n.vy;
+      if(n.x<-20)n.x=W+20; else if(n.x>W+20)n.x=-20;
+      if(n.y<-20)n.y=H+20; else if(n.y>H+20)n.y=-20;
+      if(n.flash>0) n.flash-=0.016;
+    }
+    // axons / synapses
+    ctx.lineWidth = 1;
+    for(i=0;i<edges.length;i++){ e=edges[i]; a=nodes[e.a]; b=nodes[e.b];
+      dx=a.x-b.x; dy=a.y-b.y; d=Math.sqrt(dx*dx+dy*dy);
+      if(d>maxD) continue;
+      al=(1-d/maxD)*0.16;
+      ctx.strokeStyle=LINE+al.toFixed(3)+')';
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    }
+    // action potentials down the axons
+    for(i=pulses.length-1;i>=0;i--){ var p=pulses[i]; p.t+=p.sp;
+      e=p.e; a=nodes[e.a]; b=nodes[e.b];
+      var from = p.dir?a:b, to = p.dir?b:a;
+      if(p.t>=1){ to.flash=1; pulses.splice(i,1); continue; }
+      var px=from.x+(to.x-from.x)*p.t, py=from.y+(to.y-from.y)*p.t;
+      var g=ctx.createRadialGradient(px,py,0,px,py,6.5);
+      g.addColorStop(0,CORE+'.9)'); g.addColorStop(.5,GLOW+'.45)'); g.addColorStop(1,GLOW+'0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px,py,6.5,0,6.2832); ctx.fill();
+    }
+    // neurons: soma + dendrites
+    for(i=0;i<nodes.length;i++){ n=nodes[i];
+      var fl=n.flash>0?n.flash:0, rr=n.r+fl*2.2;
+      ctx.strokeStyle=LINE+(0.14+fl*0.4).toFixed(3)+')'; ctx.lineWidth=1;
+      for(k=0;k<n.dendrites.length;k++){ dd=n.dendrites[k];
+        ctx.beginPath(); ctx.moveTo(n.x,n.y);
+        ctx.lineTo(n.x+Math.cos(dd.ang)*(dd.len+fl*3), n.y+Math.sin(dd.ang)*(dd.len+fl*3)); ctx.stroke(); }
+      if(fl>0){ var gg=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,rr*4);
+        gg.addColorStop(0,GLOW+(fl*.5).toFixed(3)+')'); gg.addColorStop(1,GLOW+'0)');
+        ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(n.x,n.y,rr*4,0,6.2832); ctx.fill(); }
+      ctx.fillStyle=SOMA+(0.45+fl*0.5).toFixed(3)+')';
+      ctx.beginPath(); ctx.arc(n.x,n.y,rr,0,6.2832); ctx.fill();
+    }
+    // bouncing 3D terms
+    if(!reduce) for(i=0;i<terms.length;i++){ var tm=terms[i];
+      tm.x+=tm.vx; tm.y+=tm.vy; tm.rot+=tm.vr;
+      if(tm.x<0){tm.x=0;tm.vx*=-1;} else if(tm.x>W-tm.w){tm.x=W-tm.w;tm.vx*=-1;}
+      if(tm.y<0){tm.y=0;tm.vy*=-1;} else if(tm.y>H-tm.h){tm.y=H-tm.h;tm.vy*=-1;}
+      tm.el.style.transform='translate3d('+tm.x.toFixed(1)+'px,'+tm.y.toFixed(1)+'px,0) rotate('+tm.rot.toFixed(2)+'deg)';
+    }
+    if(frame%8===0) spawnPulse();
+    if(!intro.classList.contains('hidden')) raf=requestAnimationFrame(tick);
+  }
+
+  function layoutTerms(){
+    if(!termHost) return;
+    if(!terms.length){
+      var words=['Neuroplasticity','Synaptogenesis','Neurogenesis','BDNF','GDNF','Myelination','Dendrite','Axon','Synapse','Neurotrophin','LTP'];
+      for(var i=0;i<words.length;i++){
+        var z=Math.random(); // depth 0..1
+        var size=(13+z*20)|0, op=(0.14+z*0.2);
+        var el=document.createElement('span'); el.className='float-term'; el.textContent=words[i];
+        el.style.fontSize=size+'px'; el.style.opacity=op.toFixed(2);
+        // stacked extrude for thick-3D look, cool dark
+        var depth=Math.round(3+z*4), sh='';
+        for(var s=1;s<=depth;s++) sh+=(s>1?',':'')+s+'px '+s+'px 0 rgba(24,46,50,'+(0.9-s*0.04).toFixed(2)+')';
+        sh+=','+(depth+2)+'px '+(depth+2)+'px '+(depth+3)+'px rgba(0,0,0,.4)';
+        el.style.textShadow=sh;
+        termHost.appendChild(el);
+        terms.push({el:el, z:z, w:0, h:0, x:0, y:0, vx:0, vy:0, rot:rand(-8,8), vr:rand(-.05,.05)});
+      }
+    }
+    for(var j=0;j<terms.length;j++){ var tm=terms[j];
+      var r=tm.el.getBoundingClientRect(); tm.w=r.width; tm.h=r.height;
+      if(tm.x===0&&tm.y===0){ tm.x=rand(0,Math.max(1,W-tm.w)); tm.y=rand(0,Math.max(1,H-tm.h)); }
+      else { tm.x=Math.min(tm.x,Math.max(0,W-tm.w)); tm.y=Math.min(tm.y,Math.max(0,H-tm.h)); }
+      var sp=0.18+tm.z*0.42, ang=rand(0,6.2832);
+      tm.vx=Math.cos(ang)*sp; tm.vy=Math.sin(ang)*sp;
+      tm.el.style.transform='translate3d('+tm.x+'px,'+tm.y+'px,0) rotate('+tm.rot+'deg)';
+    }
+  }
+
+  function staticFrame(){
+    ctx.clearRect(0,0,W,H);
+    var e,a,b,dx,dy,d,al,i,k,dd,n;
+    for(i=0;i<edges.length;i++){ e=edges[i]; a=nodes[e.a]; b=nodes[e.b];
+      dx=a.x-b.x; dy=a.y-b.y; d=Math.sqrt(dx*dx+dy*dy); if(d>maxD) continue;
+      al=(1-d/maxD)*0.16; ctx.strokeStyle=LINE+al.toFixed(3)+')';
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+    for(i=0;i<nodes.length;i++){ n=nodes[i];
+      ctx.strokeStyle=LINE+'.14)'; ctx.lineWidth=1;
+      for(k=0;k<n.dendrites.length;k++){ dd=n.dendrites[k];
+        ctx.beginPath(); ctx.moveTo(n.x,n.y);
+        ctx.lineTo(n.x+Math.cos(dd.ang)*dd.len, n.y+Math.sin(dd.ang)*dd.len); ctx.stroke(); }
+      ctx.fillStyle=SOMA+'.45)'; ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,6.2832); ctx.fill(); }
+  }
+  function start(){
+    resize();
+    if(reduce){ staticFrame(); return; }
+    cancelAnimationFrame(raf); raf=requestAnimationFrame(tick);
+  }
+  var rt; window.addEventListener('resize', function(){ clearTimeout(rt); rt=setTimeout(start,180); });
+  new MutationObserver(function(){ if(intro.classList.contains('hidden')) cancelAnimationFrame(raf); })
+    .observe(intro, {attributes:true, attributeFilter:['class']});
+  requestAnimationFrame(start);
+})();
+</script>
+
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three.module.js",
+  "three/addons/": "./vendor/addons/"
+}}
+</script>
+<script type="module" src="app.js"></script>
