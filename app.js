@@ -123,15 +123,38 @@ const W = {
    estimate. Reduced from the placeholder 22 to reflect that no dedicated
    interaction-effect study exists to calibrate against. */
 const SYN = 12;
+/* Structural model coefficients, tunable live via "Tune model coefficients"
+   for sensitivity analysis. K_DEF holds the defaults (values documented above
+   and in trajectory() comments); K is the live copy the sliders mutate. */
+const K_DEF = {
+  syn: SYN,         // synergy coefficient (see SYN comment above)
+  apoeRisk: 0.45,   // APOE-ε4 degradation multiplier per allele copy
+  nBdnf: 0.5,       // BDNF → neuroplasticity weight (drives hippocampal regrowth)
+  nCbf: 0.3,        // cerebral blood flow → neuroplasticity weight
+  nInflam: 0.35,    // neuroinflammation penalty on neuroplasticity
+  regrow: 1.15,     // hippocampal regrowth rate (per month, × neuroplasticity)
+  atrophy: 0.75,    // hippocampal atrophy rate (per month, × APOE factor)
+  plaqueGrow: 0.9,  // amyloid accrual rate (per month, × APOE factor)
+  // CST → cognition, RECALIBRATED 2026-09-08: Woods et al. 2023 Cochrane update
+  // (25 studies, n=1,893) reports MMSE +1.99 pts [1.24, 2.74] vs usual care.
+  // 0.08/mo × 24 mo ≈ +1.9 pts at 100% dose (previous hardcoded 0.33 implied
+  // +7.9 pts — ~4× the literature).
+  cstCog: 0.08,
+  // Meditation → cognition, NEW direct path 2026-09-08: Shi et al. 2025 meta
+  // (25 RCTs, n=2,095, SCD/MCI/AD) reports MMSE +2.22 pts [0.83, 3.62].
+  // 0.09/mo × 24 mo ≈ +2.2 pts at 100% dose.
+  medCog: 0.09,
+};
+const K = { ...K_DEF };
 const state = { o3:.6, ex:.6, cst:.6, med:.3, apoe:1, synOn:true, month:0 };
 
 function synergy(p){
   if(!p.synOn) return 0;
   const x = p.o3*p.ex + p.ex*p.cst + p.o3*p.cst + p.ex*p.med + p.o3*p.med;
-  return SYN * (x/5);
+  return K.syn * (x/5);
 }
 function trajectory(p){
-  const apoeF = 1 + p.apoe*0.45;
+  const apoeF = 1 + p.apoe*K.apoeRisk;
   const syn = synergy(p);
   const out = { bdnf:[], cbf:[], inflam:[], neuro:[], hippo:[], plaque:[], cog:[], npi:[], dopa:[], syn };
   let hippo = 100, plaque = 28 + p.apoe*11, cog = 24, dopa = 88;
@@ -139,20 +162,24 @@ function trajectory(p){
     const bdnf   = clamp(W.bdnf.base + p.ex*W.bdnf.ex + p.o3*W.bdnf.o3 + p.cst*W.bdnf.cst + p.med*W.bdnf.med + syn*0.6, 0, 100);
     const cbf    = clamp(W.cbf.base  + p.ex*W.cbf.ex  + p.o3*W.cbf.o3  + p.med*W.cbf.med, 0, 100);
     const inflam = clamp(W.inflam.base + p.ex*W.inflam.ex + p.o3*W.inflam.o3 + p.med*W.inflam.med + p.apoe*8, 0, 100);
-    const neuro  = clamp((bdnf*0.5 + cbf*0.3 - inflam*0.35 + syn*0.5), 0, 100);
+    const neuro  = clamp((bdnf*K.nBdnf + cbf*K.nCbf - inflam*K.nInflam + syn*0.5), 0, 100);
     const npi    = clamp(0.34*bdnf + 0.22*neuro + 0.18*cbf + 0.26*(100-inflam), 0, 100);
     out.bdnf.push(bdnf); out.cbf.push(cbf); out.inflam.push(inflam); out.neuro.push(neuro); out.npi.push(npi);
     out.hippo.push(hippo); out.plaque.push(plaque); out.cog.push(cog); out.dopa.push(dopa);
-    const atrophy   = 0.75 * apoeF;
-    const regrow    = neuro/100 * 1.15 + syn*0.012;
+    const atrophy   = K.atrophy * apoeF;
+    const regrow    = neuro/100 * K.regrow + syn*0.012;
     hippo  = clamp(hippo - atrophy + regrow - inflam*0.004, 55, 108);
-    const growth    = 0.9 * apoeF;
+    const growth    = K.plaqueGrow * apoeF;
     const clearance = (p.o3*0.55 + p.ex*0.5) * (1 + p.apoe*0.3);
     plaque = clamp(plaque + growth - clearance, 0, 100);
     const fromBrain = (hippo-90)*0.03 - (plaque-30)*0.014;
-    cog = clamp(cog + fromBrain + p.cst*0.33 - 0.07*apoeF, 0, 30);
-    const pdDecline = p.pd ? 1.9*(1+p.apoe*0.06) : 0.12;                  // nigral dopamine loss
-    const dopaRescue = (p.pd ? (p.ex*0.9 + p.med*0.8) : p.ex*0.2) * 0.6;  // exercise/meditation slow it
+    cog = clamp(cog + fromBrain + p.cst*K.cstCog + p.med*K.medCog - 0.07*apoeF, 0, 30);
+    // nigral dopamine loss, RECALIBRATED 2026-09-08: Marek et al. 2001 (Neurology,
+    // serial DAT SPECT, n=56) measured −11.2%/yr striatal dopaminergic loss in
+    // untreated PD (0.8%/yr in healthy controls). 0.95/mo × 24 ≈ −26% of the
+    // 88-point baseline ≈ the trial's −22.4%/24mo (previous 1.9 was ~2× too steep).
+    const pdDecline = p.pd ? 0.95*(1+p.apoe*0.06) : 0.12;
+    const dopaRescue = (p.pd ? (p.ex*0.9 + p.med*0.8) : p.ex*0.2) * 0.6;  // exercise/meditation slow it (Kaagman 2024 BDNF SMD 1.2; Kwok 2019)
     dopa = clamp(dopa - pdDecline + dopaRescue, 15, 100);
   }
   return out;
@@ -675,8 +702,8 @@ function refreshPath(){
       ['Dopamine level',path._dopamine,true],['Motor function',path._motor,true],
       ['Tremor / rigidity',path._tremor*100,false],['Surviving SN neurons',100-loss,true]]);
     $('#pathInfo').innerHTML=`<div class="kv"><b>Circuit</b><span>Substantia nigra pars compacta → striatum (nigrostriatal pathway), ~80% of the brain's dopamine.</span></div>
-      <div class="kv"><b>Lesion</b><span>Dopaminergic neuron loss; motor signs appear once ~60–80% are gone.</span></div>
-      <div class="kv"><b>Intervention</b><span>Aerobic exercise raises dopamine/BDNF and delays progression; meditation raises dopamine (2nd paper).</span></div>`;
+      <div class="kv"><b>Lesion</b><span>Dopaminergic neuron loss; motor signs appear once ~30–50% of nigral neurons are gone (Popescu 2024).</span></div>
+      <div class="kv"><b>Intervention</b><span>Aerobic exercise raises dopamine D2-receptor binding &amp; BDNF and delays progression (Petzinger 2013, Lancet Neurol); meditation raises dopamine (2nd paper).</span></div>`;
   } else {
     const burden=+$('#burden').value, clear=+$('#clear').value;
     $('#vBurden').textContent=burden+'%'; $('#vClear').textContent=clear+'%';
@@ -716,8 +743,8 @@ function refresh(){
   const tr = trajectory(state);
   const base = trajectory({...state, o3:0, ex:0, cst:0, med:0, synOn:false});
   brain._tr = tr;
-  drawChart(tr, base); buildGauges(tr); updateBrain();
-  $('#synVal').textContent = tr.syn.toFixed(1); $('#synBar').style.width=(tr.syn/SYN*100)+'%';
+  drawChart(tr, base); buildGauges(tr); updateBrain(); updateValidation(tr); buildScoreboard(tr, base);
+  $('#synVal').textContent = tr.syn.toFixed(1); $('#synBar').style.width=(K.syn ? tr.syn/K.syn*100 : 0)+'%';
 }
 const GAUGES=[
   {k:'cog',   lab:'Cognition (MMSE)', max:30, good:true},
@@ -739,6 +766,29 @@ function buildGauges(tr){
       <div class="bar"><i style="width:${clamp(pct,0,100)}%;background:${col}"></i></div></div>`;
   }).join('');
 }
+/* ---- plain-English scoreboard: % difference vs. untreated at current month ---- */
+const SCORE=[
+  ['bdnf',  'BDNF, the "brain fertilizer" that helps brain cells grow &amp; connect', true],
+  ['cbf',   'Blood flow, oxygen delivery to the brain', true],
+  ['inflam','Inflammation, brain irritation (lower is better)', false],
+  ['npi',   'Neuroplasticity, how easily the brain rewires itself', true],
+  ['hippo', 'Hippocampus, the brain’s memory center', true],
+  ['plaque','Amyloid plaque, sticky protein clumps (lower is better)', false],
+  ['dopa',  'Dopamine, the chemical made by the substantia nigra', true],
+  ['cog',   'Memory test score (MMSE, out of 30)', true],
+];
+function buildScoreboard(tr, base){
+  const m=state.month;
+  $('#scoreTbl').innerHTML='<tr><th>Factor</th><th>Your plan</th><th>Doing nothing</th><th>Difference</th></tr>'+
+    SCORE.map(([k,lab,goodUp])=>{
+      const a=tr[k][m], b=base[k][m], pct=b?(a-b)/b*100:0;
+      const better=goodUp?pct>=0:pct<=0;
+      const col=Math.abs(pct)<0.05?'var(--dim)':better?'var(--good)':'var(--bad)';
+      const arrow=pct>0.05?'▲':pct<-0.05?'▼':'–';
+      return `<tr><td>${lab}</td><td>${a.toFixed(1)}</td><td>${b.toFixed(1)}</td><td style="color:${col}">${arrow} ${pct>0?'+':''}${pct.toFixed(1)}%</td></tr>`;
+    }).join('');
+}
+
 function buildCoefTable(){
   const rows=[['bdnf','BDNF'],['cbf','Blood flow'],['inflam','Inflammation']];
   const cols=['base','ex','o3','cst','med'];
@@ -749,6 +799,125 @@ function buildCoefTable(){
   $('#coefTbl').querySelectorAll('input').forEach(inp=>inp.onchange=()=>{
     const v=parseFloat(inp.value); if(!isNaN(v)) W[inp.dataset.k][inp.dataset.c]=v; refresh(); });
 }
+/* ---- structural-coefficient sliders (sensitivity analysis) ---- */
+const K_META=[
+  ['nBdnf',     'BDNF → neuroplasticity weight',        0, 1.5, .05],
+  ['nCbf',      'Blood flow → neuroplasticity weight',  0, 1.5, .05],
+  ['nInflam',   'Inflammation penalty weight',          0, 1.5, .05],
+  ['regrow',    'Hippocampal regrowth rate',            0, 3,   .05],
+  ['atrophy',   'Hippocampal atrophy rate',             0, 3,   .05],
+  ['apoeRisk',  'APOE-ε4 degradation multiplier',       0, 1,   .05],
+  ['plaqueGrow','Amyloid accrual rate',                 0, 3,   .05],
+  ['cstCog',    'CST → cognition (Woods 2023 Cochrane)',0, 0.5, .01],
+  ['medCog',    'Meditation → cognition (Shi 2025)',    0, 0.5, .01],
+  ['syn',       'Synergy coefficient (SYN)',            0, 30,  1],
+];
+function buildKSliders(){
+  $('#kSliders').innerHTML = K_META.map(([k,lab,mn,mx,st])=>`
+    <div class="ctrl" style="margin-bottom:10px">
+      <label><span class="lab">${lab}</span><span class="val" id="kv_${k}">${K[k]}</span></label>
+      <input type="range" id="k_${k}" min="${mn}" max="${mx}" step="${st}" value="${K[k]}" title="Default ${K_DEF[k]}, drag to test model sensitivity; everything recalculates live">
+    </div>`).join('') + `<button class="btn reset" id="kReset" title="Restore all structural coefficients to their documented defaults">↺ Reset coefficients</button>`;
+  $('#kSliders').querySelectorAll('input[type=range]').forEach(el=>{
+    el.style.setProperty('--p', ((el.value-el.min)/(el.max-el.min)*100)+'%');
+    el.oninput=()=>{ K[el.id.slice(2)]=+el.value; $('#kv_'+el.id.slice(2)).textContent=+el.value; refresh(); };
+  });
+  $('#kReset').onclick=()=>{ Object.assign(K,K_DEF); buildKSliders(); refresh(); };
+}
+
+/* ---- validation vs. published trial endpoints ----
+   Each benchmark: the trial's 24-month expected change in hippocampal volume (%)
+   and MMSE (points), plus the slider profile it corresponds to. The panel picks
+   the benchmark closest to the current sliders and reports residuals honestly,
+   population mismatches & extrapolations are flagged in the note. */
+/* Literature base: generated by research/build_benchmarks.py from
+   research/literature.csv. Loaded at boot; when present it re-derives the
+   BENCH endpoints from the source rows and lists every source in Science
+   & Model Notes. The hardcoded BENCH below is the offline fallback. */
+let LIT=null;
+async function loadLiterature(){
+  try{
+    LIT=await (await fetch('benchmarks.json')).json();
+    const g=(t,i)=>{const e=(LIT.benchmarks[t]||[])[0];return e&&e.effect_value!=null?e.effect_value*(i||1):null;};
+    const uh=g('untreated.hippo',2), um=g('untreated.mmse',2), eh=g('exercise.hippo',2);
+    if(uh!=null) BENCH[0].hippo=+uh.toFixed(1);
+    if(um!=null) BENCH[0].mmse=+um.toFixed(1);
+    if(eh!=null) BENCH[1].hippo=+eh.toFixed(1);
+    const host=$('#sciProse');
+    if(host && LIT){
+      const all=[...Object.entries(LIT.coefficients),...Object.entries(LIT.benchmarks)]
+        .flatMap(([t,es])=>es.map(e=>({t,...e}))).concat(LIT.context.map(e=>({t:'context',...e})));
+      host.insertAdjacentHTML('beforeend',
+        `<h3>Literature base (${LIT.n_sources} sources, machine-readable)</h3>
+        <p>Generated from <code>research/literature.csv</code> by <code>research/build_benchmarks.py</code>; the validation panel's trial endpoints are derived from these rows, spanning Alzheimer's, Parkinson's/dopamine, APOE4, and all four interventions, not exercise alone.</p>
+        <table class="wt">${'<tr><th>Study</th><th>Design</th><th>Outcome</th><th>Effect</th><th>Model use</th></tr>'}
+        ${all.map(e=>`<tr><td>${e.citation.split(',')[0]}</td><td>${e.source_type}</td><td>${e.outcome||''}</td><td>${e.effect_value!=null?e.effect_type+' '+e.effect_value:'qualitative'}</td><td>${e.t}</td></tr>`).join('')}</table>`);
+    }
+    refresh();
+  }catch(e){ /* offline (file://) — hardcoded fallback values stay */ }
+}
+
+const BENCH=[
+  { label:'Untreated AD · Barnes & Fox 2009 + Han 2000 meta-analyses',
+    match:{o3:0,ex:0,cst:0,med:0}, hippo:-9.3, mmse:-6.6,
+    note:'Hippocampal atrophy ≈ −4.66%/yr (meta-analysis of serial-MRI AD studies); MMSE −3.3 pts/yr [−3.7, −2.9] (Han 2000, 37 studies, n=3,492; mild AD toward the slower end). Both extrapolated to 24 mo.' },
+  { label:'Exercise only · Erickson et al. 2011 RCT (n=120)',
+    match:{o3:0,ex:70,cst:0,med:0}, hippo:4.0, mmse:-3.4,
+    note:'+2%/yr hippocampal volume from aerobic walking, in HEALTHY older adults (population mismatch), extrapolated to 24 mo. MMSE endpoint approximated as decline slowed ~30% vs. untreated, no AD RCT reports this directly.' },
+  { label:'Multi-domain · Köbe et al. 2016 + FINGER 2015',
+    match:{o3:80,ex:80,cst:75,med:50}, hippo:0, mmse:0,
+    note:'Köbe: gray matter preserved over 6 mo in MCI (ω-3 + aerobic + cognitive stimulation). FINGER: cognition stabilized vs. control over 2 yr (composite battery, not MMSE). Δ≈0 = "hold the line", an approximation of both.' },
+];
+function updateValidation(tr){
+  const el=$('#validPanel'); if(!el) return;
+  const s={o3:+$('#o3').value, ex:+$('#ex').value, cst:+$('#cst').value, med:+$('#med').value};
+  let best=BENCH[0], bd=Infinity;
+  BENCH.forEach(b=>{ const d=['o3','ex','cst','med'].reduce((a,k)=>a+(s[k]-b.match[k])**2,0); if(d<bd){bd=d;best=b;} });
+  const rows=[   // [label, simulated Δ, trial Δ, unit, normalizing clinical range]
+    ['Hippocampal volume Δ', tr.hippo[MONTHS]-tr.hippo[0], best.hippo, '%',    20],
+    ['Cognition (MMSE) Δ',   tr.cog[MONTHS]-tr.cog[0],     best.mmse,  ' pts', 6],
+  ];
+  let pdNote='';
+  if(state.pd){ // Marek 2001 (Neurology, n=56 serial SPECT): striatal DAT −11.2%/yr in PD → −22.4% over 24 mo
+    rows.push(['Dopamine (SN) Δ', (tr.dopa[MONTHS]-tr.dopa[0])/tr.dopa[0]*100, -22.4, '%', 30]);
+    pdNote=' PD row: dopaminergic decline vs Marek 2001 serial DAT imaging (−11.2%/yr untreated; interventions in your plan slow the simulated rate).';
+  }
+  const agree=clamp(100*(1-rows.reduce((a,r)=>a+Math.min(1,Math.abs(r[1]-r[2])/r[4]),0)/rows.length),0,100);
+  const fmt=v=>(v>0?'+':'')+v.toFixed(1);
+  el.innerHTML=`
+    <div style="display:flex;gap:9px;margin-bottom:9px;font-size:13px;color:var(--dim)">
+      <b style="font-family:var(--font-mono);font-size:11.5px;letter-spacing:.02em;color:var(--ink);flex:none">CLOSEST TRIAL</b><span>${best.label}</span></div>
+    <table class="wt">
+      <tr><th>Metric, 24-month Δ</th><th>Simulated</th><th>Trial endpoint</th><th>Residual</th></tr>
+      ${rows.map(r=>{ const res=r[1]-r[2], f=Math.abs(res)/r[4];
+        const col=f<0.35?'var(--good)':f<0.8?'var(--warn)':'var(--bad)';
+        return `<tr><td>${r[0]}</td><td>${fmt(r[1])}${r[3]}</td><td>${fmt(r[2])}${r[3]}</td><td style="color:${col}">${fmt(res)}${r[3]}</td></tr>`; }).join('')}
+    </table>
+    <div class="g" style="margin-top:10px"><div class="gt"><b>Model–trial agreement</b><span class="gv">${agree.toFixed(0)} / 100</span></div>
+      <div class="bar"><i style="width:${agree}%;background:${agree>65?'var(--good)':agree>35?'var(--warn)':'var(--bad)'}"></i></div></div>
+    <p class="hint" style="margin:9px 0 0">${best.note}${pdNote} Residual = simulated − trial. The agreement score normalizes each residual by a plausible clinical range (heuristic, not a fitted statistic).</p>`;
+}
+
+/* ---- batch simulation sweep + CSV export ---- */
+let batchCsv='';
+function runBatch(){
+  const key=$('#sweepVar').value, levels=[0,25,50,75,100];
+  const name={o3:'Omega-3',ex:'Aerobic exercise',cst:'Cognitive stimulation',med:'Meditation'}[key];
+  const rows=[['sweep_var','sweep_pct','month','dopamine','neuroplasticity_index','amyloid_plaque']];
+  let sum='';
+  levels.forEach(L=>{
+    const tr=trajectory({...state,[key]:L/100});
+    for(let m=0;m<=MONTHS;m++) rows.push([key,L,m,tr.dopa[m].toFixed(2),tr.npi[m].toFixed(2),tr.plaque[m].toFixed(2)]);
+    sum+=`<tr><td>${L}%</td><td>${tr.dopa[MONTHS].toFixed(1)}</td><td>${tr.npi[MONTHS].toFixed(1)}</td><td>${tr.plaque[MONTHS].toFixed(1)}</td></tr>`;
+  });
+  batchCsv=rows.map(r=>r.join(',')).join('\n');
+  $('#batchSummary').innerHTML=`<table class="wt" style="margin:10px 0 0">
+    <tr><th>${name}</th><th>Dopamine @ 24 mo</th><th>Neuroplasticity idx @ 24 mo</th><th>Amyloid plaque @ 24 mo</th></tr>${sum}</table>
+    <p class="hint" style="margin:8px 0 0">All other sliders held at current values (ω-3 ${$('#o3').value}% · exercise ${$('#ex').value}% · CST ${$('#cst').value}% · meditation ${$('#med').value}% · APOE4 ×${$('#apoe').value}). Full 24-month trajectories in the CSV below.</p>`;
+  const ta=$('#batchCsv'); ta.value=batchCsv; ta.style.display='block';
+  $('#dlCsv').disabled=false;
+}
+
 const PRESETS={ none:{o3:0,ex:0,cst:0,med:0}, single:{o3:0,ex:70,cst:0,med:0}, synergy:{o3:80,ex:80,cst:75,med:50} };
 function applyPreset(p){ const v=PRESETS[p];
   $('#o3').value=v.o3; $('#ex').value=v.ex; $('#cst').value=v.cst; $('#med').value=v.med; refresh(); }
@@ -843,7 +1012,10 @@ function boot(){
   const fillRange = el => el.style.setProperty('--p', ((el.value-el.min)/(el.max-el.min)*100)+'%');
   document.querySelectorAll('input[type=range]').forEach(fillRange);
   document.addEventListener('input', e=>{ if(e.target.matches('input[type=range]')) fillRange(e.target); });
-  buildChartLegend(); buildCoefTable(); initSci();
-  initBrain(); initApoe(); initPath(); refresh();
+  $('#runBatch').onclick=runBatch;
+  $('#dlCsv').onclick=()=>{ const a=document.createElement('a'); a.download='neuroai-sweep.csv';
+    a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(batchCsv); a.click(); };
+  buildChartLegend(); buildCoefTable(); buildKSliders(); initSci();
+  initBrain(); initApoe(); initPath(); refresh(); loadLiterature();
 }
 boot();

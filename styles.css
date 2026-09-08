@@ -115,6 +115,9 @@ button.btn.primary:hover{background:var(--accent-soft);border-color:var(--accent
 button.btn.reset{border-color:var(--dim2);color:var(--dim)}
 button.btn.reset:hover{background:var(--panel);border-color:var(--ink);color:var(--ink)}
 
+select{background:var(--panel2);color:var(--ink);border:1px solid var(--line-strong);border-radius:var(--radius);padding:8px 10px;font-family:var(--font-mono);font-size:12.5px;cursor:pointer}
+select:hover{border-color:var(--accent)}
+
 .toggle{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dim);cursor:pointer;font-family:var(--font-mono)}
 .toggle input{accent-color:var(--accent);width:15px;height:15px}
 
