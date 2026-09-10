@@ -682,11 +682,13 @@ function buildMol(){
     knot.position.set(-0.2+i*0.28,(((i*5)%7)/7-0.5)*0.5,(((i*3)%5)/5-0.5)*0.4); knot.visible=false; knot.userData.info={name:'Tau tangle (NFT)',role:'Hyperphosphorylated tau, collapses axonal transport.'}; g.add(knot); path.tau.push(knot); }
   path.fibrils=[];
   const fibMat=new THREE.MeshStandardMaterial({color:0xc84a30,roughness:.5,emissive:0x2a0a05,emissiveIntensity:.25});
-  for(let i=0;i<28;i++){ const a=i*2.399, rr=1.15+((i*13)%7)/10;
-    // spherical (Fibonacci) shell centered on the soma so plaques surround it from every viewing angle
-    const phi=Math.acos(1-2*(i+0.5)/28);
+  // dense Fibonacci shell hugging the soma (radius .9, y-scale 1.1) so full burden encases the whole sphere;
+  // phi order is hashed so partial burden scatters over the surface instead of filling pole-down
+  const NFIB=90;
+  for(let i=0;i<NFIB;i++){ const a=i*2.399, rr=1.02+((i*13)%7)/28;
+    const phi=Math.acos(1-2*(((i*37)%NFIB)+0.5)/NFIB);
     const seg=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.3,6),fibMat);
-    seg.position.set(-1.6+rr*Math.sin(phi)*Math.cos(a), rr*Math.cos(phi)*1.05, rr*Math.sin(phi)*Math.sin(a));
+    seg.position.set(-1.6+rr*Math.sin(phi)*Math.cos(a), rr*Math.cos(phi)*1.1, rr*Math.sin(phi)*Math.sin(a));
     seg.rotation.set(a,a*1.7,a*0.5);
     seg.visible=false; seg.userData.info={name:'Amyloid-β plaque',role:'Clumped amyloid-β fibrils aggregating into an extracellular senile plaque.'}; g.add(seg); path.fibrils.push(seg); }
   const L=(t,c,pos,sc,info)=>{const l=label(t,c,sc,info);l.position.copy(pos);g.add(l);};
@@ -996,10 +998,6 @@ function initSci(){
     <span class="src">UW ADRC (NIH-funded)</span></div>
   <h3>APOE explorer</h3>
   <p>Two SNPs define the alleles: <code>rs429358</code> (codon 112) and <code>rs7412</code> (codon 158). ε4 = Arg112/Arg158; ε3 = Cys112/Arg158; ε2 = Cys112/Cys158. In ApoE4, Arg112 repositions Arg61 to form a salt bridge with Glu255, the pathogenic "domain interaction." A structure corrector (PH002-type) breaks that bond so ApoE4 behaves like ApoE3, the removable target. Gene locus: chr 19q13.32.</p>
-  <p><small>Companion to: "Impact of Omega-3, Aerobic Exercise & CST on Neuroplasticity in Early-Stage Alzheimer's" and "Positive Re-wiring of a Dying Brain: Multi-Modal Neuroplasticity in Chronic Illness Pain Management." See <code>research/</code>.</small></p>
-  <div class="cite"><a href="research/02_chronic_illness_neuroplasticity_paper.pdf?v=3" target="_blank" rel="noopener">Read the full paper (PDF), "Positive Re-wiring of a Dying Brain: Multi-Modal Neuroplasticity Enhancement in Chronic Illness Pain Management"</a>
-    <p>The chronic-illness lit review behind this app's meditation/exercise/Parkinson's mechanics, in full, for anyone who wants to check the sourcing themselves rather than take the simulator's word for it.</p>
-    <span class="src">Student research paper · PDF</span></div>
   <div class="note">A note on wording: earlier drafts of this project described lifestyle interventions as able to "reverse" Alzheimer's or chronic-illness effects. Current evidence supports that certain lifestyle interventions may improve cognitive function, biomarkers, or slow progression in some contexts, but they have not been shown to reverse Alzheimer's disease generally. Both papers and this app have been revised to reflect that; treat this as a hypothesis-exploration and educational tool, not a treatment claim.</div>`;
 }
 
