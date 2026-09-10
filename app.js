@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { APOE_CA, APOE_HELICES, APOE_PDB } from './apoe_structure.js';
 
 /* ============================================================
    Neuroplasticity Exploration Simulator ,  app.js
@@ -465,44 +466,74 @@ function cyl(a,b,r,mat){
   m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), d.clone().normalize());
   return m;
 }
+/* Real backbone: Cα trace of PDB 2L7B (full-length human ApoE, NMR model 1),
+   rendered cartoon-style — thick coiled tubes for the 12 real α-helices, thin
+   worms for loops, colored by domain. Residue markers sit at their true
+   positions on the fold. */
 function buildProtein(){
   const g=new THREE.Group();
-  const nGrp=new THREE.Group(); g.add(nGrp); g.nGrp=nGrp;
-  const helixMat=new THREE.MeshStandardMaterial({color:0x6fa8cf,roughness:.5});
-  const hx=[[-.5,0],[.5,0],[-.5,1],[.5,1]];
-  hx.forEach(([x,z])=>{ const h=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.28,2.6,18), helixMat);
-    h.position.set(x, 0.9, z*0.9-0.45); h.userData.info={name:'N-terminal domain (α-helices)',role:'Receptor-binding domain, four helices that dock ApoE into the LDL receptor.'}; nGrp.add(h); });
-  const ldlr=new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16),
-    new THREE.MeshStandardMaterial({color:0x3f86c4,emissive:0x0a2036}));
-  ldlr.position.set(0,2.15,-0.1); ldlr.userData.info={name:'LDLR-binding region (136–150)',role:'Where ApoE engages the LDL receptor to clear lipids from the bloodstream.'}; nGrp.add(ldlr);
-  const cGrp=new THREE.Group(); g.add(cGrp); g.cGrp=cGrp;
-  const cdom=new THREE.Mesh(new THREE.CapsuleGeometry(0.45,2.2,8,16),
-    new THREE.MeshStandardMaterial({color:0x5fbf9f,roughness:.5}));
-  cdom.position.set(0,-1.9,0.2); cdom.userData.info={name:'C-terminal domain',role:'Lipid-binding domain, anchors ApoE to lipoprotein particles.'}; cGrp.add(cdom);
-  const hinge=cyl(new THREE.Vector3(0,-0.4,0), new THREE.Vector3(0,-0.9,0.1),0.12,
-    new THREE.MeshStandardMaterial({color:0x8493a0}));
-  hinge.userData.info={name:'Domain-linking hinge',role:'Flexible tether between the N- and C-terminal domains.'};
-  g.add(hinge);
-  const resGeo=new THREE.SphereGeometry(0.22,16,16);
-  const mkRes=(name,pos,col,role)=>{ const m=new THREE.Mesh(resGeo,new THREE.MeshStandardMaterial({color:col,emissive:0x111111}));
-    m.position.copy(pos); m.userData.info={name,role}; g.add(m); const l=label(name,'#fff',.32,{name,role}); l.position.copy(pos.clone().add(new THREE.Vector3(0,0.35,0))); g.add(l);
+  const pos=new Map(APOE_CA.map(([r,x,y,z])=>[r,new THREE.Vector3(x,y,z)]));
+  const P=r=>pos.get(r).clone();
+  const NRES=APOE_CA.length, CT_START=201;                 // hinge ends ~200; C-terminal domain 201–299
+  const inHelix=r=>APOE_HELICES.some(([a,b])=>r>=a&&r<=b);
+  const nGrp=new THREE.Group(), cGrp=new THREE.Group();
+  g.add(nGrp); g.add(cGrp); g.nGrp=nGrp; g.cGrp=cGrp;
+  const SEG={
+    nt:   {col:0x5fbf9f, info:{name:'N-terminal domain (four-helix bundle)',role:'Receptor-binding domain, four long α-helices packed side-by-side that dock ApoE into the LDL receptor.'}},
+    ldlr: {col:0xf0c05a, info:{name:'LDLR-binding region (136–150)',role:'Where ApoE engages the LDL receptor to clear lipids from the bloodstream, a stretch of helix 4.'}},
+    hinge:{col:0xb9a98c, info:{name:'Hinge region',role:'Flexible tether between the N- and C-terminal domains.'}},
+    ct:   {col:0xe0876a, info:{name:'C-terminal domain (lipid-binding)',role:'Amphipathic helices that anchor ApoE to lipoprotein particles; folds back against the bundle.'}},
+  };
+  const segOf=r=> (r>=136&&r<=150)?'ldlr' : r<=163?'nt' : r<=200?'hinge' : 'ct';
+  // walk the chain, emitting one tube per contiguous run of (segment, helix/loop)
+  let run=[1];
+  const flush=(endR)=>{
+    const r0=run[0], key=segOf(r0), hel=inHelix(r0);
+    const pts=[]; for(let r=Math.max(1,r0-1); r<=Math.min(NRES,endR+1); r++) pts.push(P(r)); // 1-residue overlap keeps the chain visually continuous
+    if(pts.length<2) return;
+    const tube=new THREE.Mesh(
+      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length*3, hel?0.058:0.026, 8),
+      new THREE.MeshStandardMaterial({color:SEG[key].col,roughness:hel?.45:.6}));
+    tube.userData.info=SEG[key].info;
+    (r0>=CT_START?cGrp:nGrp).add(tube);
+  };
+  for(let r=2;r<=NRES;r++){
+    const prev=run[run.length-1];
+    if(segOf(r)!==segOf(prev) || inHelix(r)!==inHelix(prev) || (r>=CT_START)!==(prev>=CT_START)){ flush(prev); run=[r]; }
+    else run.push(r);
+  }
+  flush(NRES);
+  const resGeo=new THREE.SphereGeometry(0.16,16,16);
+  const UP=new THREE.Vector3(0,0,0.42);                    // local z = world vertical after the group rotation below
+  const mkRes=(name,r,col,role,parent)=>{ const m=new THREE.Mesh(resGeo,new THREE.MeshStandardMaterial({color:col,emissive:0x111111}));
+    m.position.copy(P(r)); m.userData.info={name,role}; parent.add(m);
+    const l=label(name,'#fff',.3,{name,role}); l.position.copy(P(r).add(UP)); parent.add(l);
     return {mesh:m,lab:l}; };
-  g.res112 = mkRes('112', new THREE.Vector3(-0.7,1.2,0.6), 0x5fae7a, 'Cys112 (ε2/ε3) or Arg112 (ε4), the residue whose identity repositions Arg61 in ApoE4.');
-  g.res158 = mkRes('158', new THREE.Vector3(0.7,-0.2,0.7), 0x8a95a3, 'Arg158 (ε3/ε4, common) or Cys158 (ε2), defines the second SNP.');
-  g.res61  = mkRes('Arg61', new THREE.Vector3(-0.2,0.2,0.9), 0xf0d68a, 'In ApoE4, repositioned by Arg112 to form a salt bridge with Glu255, the pathogenic domain interaction.');
-  g.res255 = mkRes('Glu255', new THREE.Vector3(0.1,-1.1,0.7), 0xf0d68a, 'Partners with Arg61 in ApoE4 to form the salt bridge that locks the domains together.');
-  g.bridge = cyl(g.res61.mesh.position, g.res255.mesh.position, 0.06,
+  g.res112 = mkRes('112',112, 0x5fae7a,'Cys112 (ε2/ε3) or Arg112 (ε4), sits on helix 3; its identity repositions Arg61 in ApoE4.',nGrp);
+  g.res158 = mkRes('158',158, 0x8a95a3,'Arg158 (ε3/ε4, common) or Cys158 (ε2), on helix 4, defines the second SNP.',nGrp);
+  g.res61  = mkRes('Arg61',61, 0xf0d68a,'On helix 2. In ApoE4, repositioned by Arg112 to form a salt bridge with Glu255, the pathogenic domain interaction.',nGrp);
+  g.res255 = mkRes('Glu255',255,0xf0d68a,'On the long C-terminal helix. Partners with Arg61 in ApoE4 to form the salt bridge that locks the domains together.',cGrp);
+  // 2L7B is the ApoE3 pose: 61 and 255 far apart. ε4 rigid-body swings the CT
+  // domain ~55% of the way toward Arg61 to close the salt bridge; the bridge rod
+  // is built at that clamped pose and only shown once ε4 is selected.
+  g.ctClamp = P(61).sub(P(255)).multiplyScalar(0.55);
+  const p255e4 = P(255).add(g.ctClamp);
+  g.bridge = cyl(P(61), p255e4, 0.045,
     new THREE.MeshStandardMaterial({color:0xe2705f,emissive:0x2a0c08}));
   g.bridge.userData.info={name:'Domain interaction (salt bridge)',role:'The Arg61–Glu255 bond unique to ApoE4, the removable pathogenic feature; a structure corrector breaks it.'};
   g.bridge.visible=false; g.add(g.bridge);
-  g.bridgeLab = label('domain interaction','#ff9a9a',.34,g.bridge.userData.info);
-  g.bridgeLab.position.copy(g.res61.mesh.position.clone().lerp(g.res255.mesh.position,.5).add(new THREE.Vector3(0.9,0,0)));
+  g.bridgeLab = label('domain interaction','#ff9a9a',.32,g.bridge.userData.info);
+  g.bridgeLab.position.copy(P(61).lerp(p255e4,.5).add(new THREE.Vector3(0.9,0,0)));
   g.bridgeLab.visible=false; g.add(g.bridgeLab);
-  const lab=(t,c,pos,sc,info)=>{const l=label(t,c,sc,info);l.position.copy(pos);g.add(l);};
-  lab('N-terminal · receptor-binding','#bfe0f0', new THREE.Vector3(0,3.05,0),.4,{name:'N-terminal domain (α-helices)',role:'Receptor-binding domain, four helices that dock ApoE into the LDL receptor.'});
-  lab('LDLR-binding 136–150','#8fc4e2', new THREE.Vector3(1.7,2.15,0),.38,{name:'LDLR-binding region (136–150)',role:'Where ApoE engages the LDL receptor to clear lipids from the bloodstream.'});
-  lab('C-terminal · lipid-binding','#a9d8c8', new THREE.Vector3(0,-3.35,0),.4,{name:'C-terminal domain',role:'Lipid-binding domain, anchors ApoE to lipoprotein particles.'});
-  g.scale.setScalar(0.9);
+  const centroid=(a,b)=>{const c=new THREE.Vector3();for(let r=a;r<=b;r++)c.add(P(r));return c.multiplyScalar(1/(b-a+1));};
+  const lab=(t,c,posV,sc,info,parent)=>{const l=label(t,c,sc,info);l.position.copy(posV);(parent||g).add(l);};
+  lab('N-terminal · receptor-binding','#a9e0cc', centroid(24,163).add(new THREE.Vector3(0,0,1.1)),.38,SEG.nt.info,nGrp);
+  lab('LDLR-binding 136–150','#f0d08a', P(143).add(new THREE.Vector3(0,0,-0.55)),.34,SEG.ldlr.info,nGrp);
+  lab('C-terminal · lipid-binding','#f0b09a', centroid(210,299).add(new THREE.Vector3(0,0,-1.1)),.38,SEG.ct.info,cGrp);
+  lab(`Backbone: PDB ${APOE_PDB} (NMR)`,'#9aa89f', new THREE.Vector3(0,0,3.5),.3,
+    {name:`PDB ${APOE_PDB}`,role:'This shape is the real experimentally-solved backbone of human ApoE (full-length NMR structure), drawn as a Cα cartoon.'});
+  g.rotation.x=-Math.PI/2;                                  // long bundle axis (data z) → vertical
+  g.scale.setScalar(1.0);
   return g;
 }
 function updateApoe(){
@@ -518,24 +549,26 @@ function updateApoe(){
   apoe.prot.res158.mesh.material.color.set(iso.r158==='Arg'?0xe2705f:0x5fae7a);
   apoe.prot.res158.lab.setText(`${iso.r158}158`);
   apoe.prot.bridge.visible = isE4; apoe.prot.bridgeLab.visible = isE4;
-  const tint = new THREE.Color(iso.col);
-  apoe.prot.nGrp.children.forEach(c=>{ if(c.material?.color) c.material.color.lerp(tint,0.12); });
+  // ε4 (uncorrected) swings the CT domain toward Arg61 to close the salt bridge;
+  // ε2/ε3/corrector relax back to the open PDB (ApoE3) pose — animated in animateApoe
+  apoe.prot._ctTarget = isE4 ? apoe.prot.ctClamp : new THREE.Vector3();
   $('#isoTag').textContent = `Isoform ${iso.name}${apoe.fix?' + corrector':''}`;
 }
 function animateApoe(){
   requestAnimationFrame(animateApoe);
   if(!isActive('apoe')) return;
+  if(apoe.prot&&apoe.prot._ctTarget) apoe.prot.cGrp.position.lerp(apoe.prot._ctTarget,0.06);
   apoe.ctrl.update(); apoe.r.render(apoe.scene, apoe.cam);
 }
 function setView(v){
   apoe.view=v; apoe.dna.visible=(v==='dna'); apoe.prot.visible=(v==='protein');
   $('#viewSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
-  $('#geneTag').textContent = v==='dna' ? 'Double helix · codons 112 & 158' : 'Folded protein · two domains';
+  $('#geneTag').textContent = v==='dna' ? 'Double helix · codons 112 & 158' : `Folded protein · real backbone, PDB ${APOE_PDB}`;
   $('#proteinCard').style.opacity = v==='protein'?1:.55;
-  apoe.cam.position.set(0,0, v==='dna'?9:12.8);
+  apoe.cam.position.set(0,0, v==='dna'?9:10.5);
   $('#geneLegend').innerHTML = v==='dna'
     ? '<span><i style="background:#5fae7a"></i>T allele (→Cys)</span><span><i style="background:#e2705f"></i>C allele (→Arg)</span><span><i style="background:#4a90c4"></i>strand A</span><span><i style="background:#46bfa0"></i>strand B</span><span><i style="background:#8493a0"></i>base pair</span>'
-    : '<span><i style="background:#6fa8cf"></i>N-terminal domain</span><span><i style="background:#5fbf9f"></i>C-terminal domain</span><span><i style="background:#e2705f"></i>salt bridge (ε4)</span><span><i style="background:#f0d68a"></i>key residue</span>';
+    : '<span><i style="background:#5fbf9f"></i>N-terminal four-helix bundle</span><span><i style="background:#f0c05a"></i>LDLR-binding 136–150</span><span><i style="background:#b9a98c"></i>hinge</span><span><i style="background:#e0876a"></i>C-terminal domain</span><span><i style="background:#e2705f"></i>salt bridge (ε4)</span><span><i style="background:#f0d68a"></i>key residue</span>';
 }
 function setIso(n){
   apoe.iso=n;
