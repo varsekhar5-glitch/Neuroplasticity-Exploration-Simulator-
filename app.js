@@ -107,27 +107,14 @@ const W = {
     med: -2,
   },
 };
-/* Ngandu et al. 2015 (FINGER trial), Lancet 385(9984):2255-2263. RCT, n=1,260,
-   2-year multi-domain intervention (diet+exercise+cognitive training+vascular risk
-   management) vs. control in at-risk-but-cognitively-largely-intact older adults —
-   NOT diagnosed AD patients. Combined intervention: +25% relative improvement on
-   composite cognitive test battery vs. control.
-   CRITICAL GAP: FINGER reports only the combined multi-domain effect vs. control —
-   no factorial arm isolating single domains, so there is NO empirical measurement of
-   synergy/interaction (more-than-the-sum-of-parts) anywhere in this literature. A
-   2022 follow-up (Ngandu et al., Alzheimer's & Dementia) found domain-adherence
-   variables too multicollinear to even estimate each component's independent
-   contribution. This makes SYN the single most speculative parameter in the model —
-   it operationalizes the two source papers' own thesis ("rarely studied together")
-   as an explicit, labeled HYPOTHESIS under test, not a literature-derived point
-   estimate. Reduced from the placeholder 22 to reflect that no dedicated
-   interaction-effect study exists to calibrate against. */
-const SYN = 12;
+/* Synergy term REMOVED 2026-09-10: no trial anywhere combines all four
+   interventions, so there is nothing to calibrate an interaction effect
+   against (FINGER 2015 has no factorial arms). The model now sums the
+   literature-derived single-intervention effects only. */
 /* Structural model coefficients, tunable live via "Tune model coefficients"
    for sensitivity analysis. K_DEF holds the defaults (values documented above
    and in trajectory() comments); K is the live copy the sliders mutate. */
 const K_DEF = {
-  syn: SYN,         // synergy coefficient (see SYN comment above)
   apoeRisk: 0.45,   // APOE-ε4 degradation multiplier per allele copy
   nBdnf: 0.5,       // BDNF → neuroplasticity weight (drives hippocampal regrowth)
   nCbf: 0.3,        // cerebral blood flow → neuroplasticity weight
@@ -146,28 +133,22 @@ const K_DEF = {
   medCog: 0.09,
 };
 const K = { ...K_DEF };
-const state = { o3:.6, ex:.6, cst:.6, med:.3, apoe:1, synOn:true, month:0 };
+const state = { o3:.6, ex:.6, cst:.6, med:.3, apoe:1, month:0 };
 
-function synergy(p){
-  if(!p.synOn) return 0;
-  const x = p.o3*p.ex + p.ex*p.cst + p.o3*p.cst + p.ex*p.med + p.o3*p.med;
-  return K.syn * (x/5);
-}
 function trajectory(p){
   const apoeF = 1 + p.apoe*K.apoeRisk;
-  const syn = synergy(p);
-  const out = { bdnf:[], cbf:[], inflam:[], neuro:[], hippo:[], plaque:[], cog:[], npi:[], dopa:[], syn };
+  const out = { bdnf:[], cbf:[], inflam:[], neuro:[], hippo:[], plaque:[], cog:[], npi:[], dopa:[] };
   let hippo = 100, plaque = 28 + p.apoe*11, cog = 24, dopa = 88;
   for(let m=0; m<=MONTHS; m++){
-    const bdnf   = clamp(W.bdnf.base + p.ex*W.bdnf.ex + p.o3*W.bdnf.o3 + p.cst*W.bdnf.cst + p.med*W.bdnf.med + syn*0.6, 0, 100);
+    const bdnf   = clamp(W.bdnf.base + p.ex*W.bdnf.ex + p.o3*W.bdnf.o3 + p.cst*W.bdnf.cst + p.med*W.bdnf.med, 0, 100);
     const cbf    = clamp(W.cbf.base  + p.ex*W.cbf.ex  + p.o3*W.cbf.o3  + p.med*W.cbf.med, 0, 100);
     const inflam = clamp(W.inflam.base + p.ex*W.inflam.ex + p.o3*W.inflam.o3 + p.med*W.inflam.med + p.apoe*8, 0, 100);
-    const neuro  = clamp((bdnf*K.nBdnf + cbf*K.nCbf - inflam*K.nInflam + syn*0.5), 0, 100);
+    const neuro  = clamp((bdnf*K.nBdnf + cbf*K.nCbf - inflam*K.nInflam), 0, 100);
     const npi    = clamp(0.34*bdnf + 0.22*neuro + 0.18*cbf + 0.26*(100-inflam), 0, 100);
     out.bdnf.push(bdnf); out.cbf.push(cbf); out.inflam.push(inflam); out.neuro.push(neuro); out.npi.push(npi);
     out.hippo.push(hippo); out.plaque.push(plaque); out.cog.push(cog); out.dopa.push(dopa);
     const atrophy   = K.atrophy * apoeF;
-    const regrow    = neuro/100 * K.regrow + syn*0.012;
+    const regrow    = neuro/100 * K.regrow;
     hippo  = clamp(hippo - atrophy + regrow - inflam*0.004, 55, 108);
     const growth    = K.plaqueGrow * apoeF;
     const clearance = (p.o3*0.55 + p.ex*0.5) * (1 + p.apoe*0.3);
@@ -206,21 +187,28 @@ function drawMarker(g,x,y,shape,color){
 }
 function drawChart(tr, base){
   const c = $('#chart'), g = c.getContext('2d');
-  const W0 = c.width, H0 = c.height, pad = 30;
+  const W0 = c.width, H0 = c.height, padL = 58, padR = 6, padT = 14, padB = 34;
+  const pw = W0-padL-padR, ph = H0-padT-padB;
   g.clearRect(0,0,W0,H0);
   g.strokeStyle = '#3a3632'; g.lineWidth = 1;
-  for(let i=0;i<=4;i++){ const y = pad + (H0-2*pad)*i/4; g.beginPath(); g.moveTo(pad,y); g.lineTo(W0-6,y); g.stroke(); }
+  for(let i=0;i<=4;i++){ const y = padT + ph*i/4; g.beginPath(); g.moveTo(padL,y); g.lineTo(W0-padR,y); g.stroke(); }
   g.fillStyle = '#928879'; g.font = '10px ui-monospace,"SF Mono",monospace';
-  for(let m=0;m<=MONTHS;m+=6){ const x = pad + (W0-pad-6)*m/MONTHS; g.fillText(m+'mo', x-8, H0-4); }
+  g.textAlign='right';
+  for(let i=0;i<=4;i++){ const y = padT + ph*i/4; g.fillText((100-i*25)+'%', padL-7, y+3.5); }
+  g.textAlign='center';
+  for(let m=0;m<=MONTHS;m+=6){ const x = padL + pw*m/MONTHS; g.fillText(String(m), x, H0-padB+13); }
+  g.fillText('Time (months)', padL+pw/2, H0-4);
+  g.save(); g.translate(11, padT+ph/2); g.rotate(-Math.PI/2); g.fillText('Level (% of series max)', 0, 0); g.restore();
+  g.textAlign='left';
   const plot = (arr, max, color, dash, shape) => {
     g.beginPath(); g.setLineDash(dash?[4,4]:[]); g.strokeStyle = color; g.lineWidth = dash?1.4:2.2;
-    arr.forEach((v,m)=>{ const x = pad+(W0-pad-6)*m/MONTHS, y = pad+(H0-2*pad)*(1-v/max);
+    arr.forEach((v,m)=>{ const x = padL+pw*m/MONTHS, y = padT+ph*(1-v/max);
       m?g.lineTo(x,y):g.moveTo(x,y); }); g.stroke(); g.setLineDash([]);
-    if(!dash) arr.forEach((v,m)=>{ if(m%4) return; const x = pad+(W0-pad-6)*m/MONTHS, y = pad+(H0-2*pad)*(1-v/max); drawMarker(g,x,y,shape,color); });
+    if(!dash) arr.forEach((v,m)=>{ if(m%4) return; const x = padL+pw*m/MONTHS, y = padT+ph*(1-v/max); drawMarker(g,x,y,shape,color); });
   };
   SERIES.filter(s=>s.on).forEach(s=>{ plot(base[s.key], s.max, s.color, true, s.shape); plot(tr[s.key], s.max, s.color, false, s.shape); });
-  const mx = pad+(W0-pad-6)*state.month/MONTHS;
-  g.strokeStyle = '#4fbd7299'; g.setLineDash([2,3]); g.beginPath(); g.moveTo(mx,pad); g.lineTo(mx,H0-pad); g.stroke(); g.setLineDash([]);
+  const mx = padL+pw*state.month/MONTHS;
+  g.strokeStyle = '#4fbd7299'; g.setLineDash([2,3]); g.beginPath(); g.moveTo(mx,padT); g.lineTo(mx,H0-padB); g.stroke(); g.setLineDash([]);
 }
 function shapeSwatch(shape,color){
   const shapes = {
@@ -331,7 +319,13 @@ function setupInspect(o, panelSel){
 }
 function exportPNG(o,name){ o.r.render(o.scene,o.cam); const a=document.createElement('a'); a.download=(name||'neuroai')+'.png'; a.href=o.r.domElement.toDataURL('image/png'); a.click(); }
 const SECT={sagittal:[-1,0,0],coronal:[0,0,-1],axial:[0,-1,0]};
-function setSection(axis){ const n=SECT[axis]||SECT.sagittal; brain.clip.normal.set(n[0],n[1],n[2]); setDissect(+$('#dissect').value);
+const SECT_TAG={sagittal:'Sagittal section · left/right',coronal:'Coronal section · front/back',axial:'Axial section · top/bottom'};
+const setRange=(el,v)=>{ el.value=v; el.style.setProperty('--p',((v-el.min)/(el.max-el.min)*100)+'%'); };
+function updateViewTag(){ const t=$('#brainViewTag'); if(!t) return;
+  t.textContent = +$('#dissect').value>=98 ? 'Left lateral view · whole brain' : SECT_TAG[brain.axis||'sagittal']; }
+function setSection(axis){ const n=SECT[axis]||SECT.sagittal; brain.axis=axis; brain.clip.normal.set(n[0],n[1],n[2]);
+  const d=$('#dissect'); if(+d.value>=98) setRange(d,55);   // picking a plane with no cut engaged would look like a dead button — open the cut so the choice shows
+  setDissect(+d.value); updateInnerVis(); updateViewTag();
   $('#sectSeg')&&$('#sectSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.sect===axis)); }
 function initBrain(){
   const vp=$('#brainVP');Object.assign(brain,makeScene(vp),brain);
@@ -381,13 +375,13 @@ function initBrain(){
     const a=i*2.4;m.position.set(Math.cos(a)*.7*(i%2?1:-1),-.2+((i*5)%7)/7*.3,Math.sin(a)*.5);}
   brain.blood=new THREE.Mesh(new THREE.SphereGeometry(1.95,32,24),new THREE.MeshBasicMaterial({color:COL.blood,transparent:true,opacity:.05,side:THREE.BackSide}));
   brain.blood.scale.set(...XS);root.add(brain.blood);
-  setGhost(100);setDissect(100);updateInnerVis();
+  setGhost(15);setDissect(100);updateInnerVis();
   setupInspect(brain,'#brainInspect');
   animateBrain();
 }
-function setGhost(v){const o=clamp(v/100,.15,1);brain.shells.forEach(m=>{if(m.material){m.material.opacity=o;m.material.transparent=true;m.material.depthWrite=o>.95;}});}
+function setGhost(v){const o=clamp((115-v)/100,.15,1);brain.shells.forEach(m=>{if(m.material){m.material.opacity=o;m.material.transparent=true;m.material.depthWrite=o>.95;}});} // slider right = more transparent
 function setDissect(v){brain.clip.constant=(v/100)*CMAX;}
-function updateInnerVis(){const show=(+$('#ghost').value<72)||(+$('#dissect').value<96);brain.innerLabels.forEach(l=>l.visible=show);}
+function updateInnerVis(){const show=(+$('#ghost').value>43)||(+$('#dissect').value<96);brain.innerLabels.forEach(l=>l.visible=show);}
 function updateBrain(){
   if(!brain.hip)return;const tr=brain._tr,m=state.month;
   const hip=tr.hippo[m],plaque=tr.plaque[m],cbf=tr.cbf[m],neuro=tr.neuro[m],dopa=tr.dopa[m];
@@ -602,7 +596,7 @@ function buildPark(){
     const body=new THREE.Mesh(new THREE.SphereGeometry(0.16,18,14),
       new THREE.MeshStandardMaterial({color:0x3a2416,roughness:.5,emissive:0x140a04,emissiveIntensity:.5}));
     body.position.copy(p0); body.userData.info={name:'Dopaminergic neuron',role:'Makes dopamine; projects nigra→striatum.'}; g.add(body);
-    const axon=new THREE.Mesh(new THREE.TubeGeometry(curve,30,0.03,8),axMat.clone()); axon.userData.info={name:'Nigrostriatal axon',role:'Carries dopamine signals to the striatum.'}; g.add(axon);
+    const axon=new THREE.Mesh(new THREE.TubeGeometry(curve,30,0.03,8),axMat.clone()); axon.userData.info={name:'Nigrostriatal axon',role:'Carries dopamine signals to the striatum. The darker it turns, the less dopamine it is sending, and the slower that dopamine travels.'}; g.add(axon);
     path.neurons.push({body,axon,curve});
   }
   const dm=new THREE.MeshBasicMaterial({color:0xffe08a});
@@ -614,22 +608,26 @@ function buildPark(){
   const L=(t,c,pos,sc,info)=>{const l=label(t,c,sc,info);l.position.copy(pos);g.add(l);};
   L('Substantia nigra','#e8c7a8',new THREE.Vector3(0,-2.05,0),.4,{name:'Substantia nigra',role:'Dopaminergic neuron cluster; degenerates in Parkinson’s.'});
   L('Striatum','#f0cbb8',new THREE.Vector3(0,2.55,0),.4,{name:'Striatum',role:'Movement control; receives dopamine from the nigra.'});
-  L('Nigrostriatal axons','#e8d2b0',new THREE.Vector3(1.75,0.4,0),.36,{name:'Nigrostriatal axon',role:'Carries dopamine signals to the striatum.'});
+  L('Nigrostriatal axons','#e8d2b0',new THREE.Vector3(1.75,0.4,0),.36,{name:'Nigrostriatal axon',role:'Carries dopamine signals to the striatum. The darker it turns, the less dopamine it is sending, and the slower that dopamine travels.'});
   L('Dopamine','#ffe08a',new THREE.Vector3(-1.5,0.1,0),.34,{name:'Dopamine',role:'The neurotransmitter itself, released by the axon terminal and taken up by the striatum, its flow is what falls as substantia nigra neurons die.'});
   return g;
 }
 function updatePark(loss,rescue){
   const dopamine=clamp((1-loss/100)*100 + rescue*0.32, 0, 100);
   const nShow=Math.round((1-loss/100)*path.neurons.length);
+  // darker axon = less dopamine being carried; particle speed falls with it too
+  const axCol=lerpC(new THREE.Color(0x231106), new THREE.Color(0x8a6a4a), dopamine/100);
   path.neurons.forEach((n,i)=>{
     const alive=i<nShow;
     n.body.material.color.set(alive?0x3a2416:0x9c8b78);
     n.body.material.emissiveIntensity=alive?0.5:0.05;
     n.body.scale.setScalar(alive?1:0.6);
+    if(alive) n.axon.material.color.copy(axCol);
     n.axon.material.opacity=alive?1:0.22; n.axon.material.transparent=!alive;
   });
   const nDopa=Math.round(dopamine/100*path.dopa.length);
   path.dopa.forEach((d,i)=>d.on=i<nDopa);
+  path._speedF=0.25+0.75*dopamine/100;   // dark, failing axons move dopamine at ~1/4 healthy speed
   path._tremor=(100-dopamine)/100; path._dopamine=dopamine; path._motor=clamp(dopamine*0.9+8,0,100);
 }
 // ---- Molecular AD: plaques + tangles ----
@@ -651,16 +649,19 @@ function buildMol(){
     knot.position.set(-0.2+i*0.28,(((i*5)%7)/7-0.5)*0.5,(((i*3)%5)/5-0.5)*0.4); knot.visible=false; knot.userData.info={name:'Tau tangle (NFT)',role:'Hyperphosphorylated tau, collapses axonal transport.'}; g.add(knot); path.tau.push(knot); }
   path.fibrils=[];
   const fibMat=new THREE.MeshStandardMaterial({color:0xc84a30,roughness:.5,emissive:0x2a0a05,emissiveIntensity:.25});
-  for(let i=0;i<28;i++){ const a=i*2.399, rr=0.35+((i*13)%7)/12;
+  for(let i=0;i<28;i++){ const a=i*2.399, rr=1.15+((i*13)%7)/10;
+    // spherical (Fibonacci) shell centered on the soma so plaques surround it from every viewing angle
+    const phi=Math.acos(1-2*(i+0.5)/28);
     const seg=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.3,6),fibMat);
-    seg.position.set(-1.6+Math.cos(a)*rr,Math.sin(a)*rr,1.1+((i*7)%5)/8); seg.rotation.set(a,a*1.7,a*0.5);
+    seg.position.set(-1.6+rr*Math.sin(phi)*Math.cos(a), rr*Math.cos(phi)*1.05, rr*Math.sin(phi)*Math.sin(a));
+    seg.rotation.set(a,a*1.7,a*0.5);
     seg.visible=false; seg.userData.info={name:'Amyloid-β plaque',role:'Clumped amyloid-β fibrils aggregating into an extracellular senile plaque.'}; g.add(seg); path.fibrils.push(seg); }
   const L=(t,c,pos,sc,info)=>{const l=label(t,c,sc,info);l.position.copy(pos);g.add(l);};
   L('Neuron soma','#f0d4b8',new THREE.Vector3(-1.6,1.3,0),.38,{name:'Neuron soma',role:'Cell body of the neuron.'});
   L('Axon','#e8cfa8',new THREE.Vector3(1.95,0.6,0),.34,{name:'Axon',role:'Signal projection; transport runs along the microtubules.'});
   L('Microtubules','#bfe0d8',new THREE.Vector3(0.9,-0.9,0),.34,{name:'Microtubule',role:'Transport track normally stabilized by tau.'});
   L('Tau tangles (NFT)','#c9a06a',new THREE.Vector3(0.6,1.05,0),.36,{name:'Tau tangle (NFT)',role:'Hyperphosphorylated tau, collapses axonal transport.'});
-  L('Amyloid-β plaque','#e88a70',new THREE.Vector3(-1.6,-1.45,1.1),.38,{name:'Amyloid-β plaque',role:'Clumped amyloid-β fibrils aggregating into an extracellular senile plaque.'});
+  L('Amyloid-β plaque','#e88a70',new THREE.Vector3(-1.6,-2.15,0),.38,{name:'Amyloid-β plaque',role:'Clumped amyloid-β fibrils aggregating into an extracellular senile plaque.'});
   return g;
 }
 function updateMol(burden,clear){
@@ -687,7 +688,7 @@ function setPview(v){
   path.park.position.set(0,0,0);
   $('#pathTag').textContent=v==='park'?'Nigrostriatal dopamine pathway':'Amyloid-β plaque & tau neurofibrillary tangles';
   $('#pathLegend').innerHTML = v==='park'
-    ? '<span><i style="background:#2c1a10"></i>Substantia nigra (neuromelanin)</span><span><i style="background:#3a2416"></i>Dopaminergic neuron</span><span><i style="background:#a8705a"></i>Striatum</span><span><i style="background:#ffe08a"></i>Dopamine</span>'
+    ? '<span><i style="background:#2c1a10"></i>Substantia nigra (neuromelanin)</span><span><i style="background:#3a2416"></i>Dopaminergic neuron</span><span><i style="background:#a8705a"></i>Striatum</span><span><i style="background:#ffe08a"></i>Dopamine</span><span><i style="background:#231106"></i>Darker axon = less &amp; slower dopamine</span>'
     : '<span><i style="background:#c84a30"></i>Amyloid-β fibril</span><span><i style="background:#6a4a2a"></i>Tau tangle (NFT)</span><span><i style="background:#8fb3ad"></i>Microtubule</span><span><i style="background:#caa184"></i>Neuron</span>';
   refreshPath();
 }
@@ -703,7 +704,8 @@ function refreshPath(){
       ['Tremor / rigidity',path._tremor*100,false],['Surviving SN neurons',100-loss,true]]);
     $('#pathInfo').innerHTML=`<div class="kv"><b>Circuit</b><span>Substantia nigra pars compacta → striatum (nigrostriatal pathway), ~80% of the brain's dopamine.</span></div>
       <div class="kv"><b>Lesion</b><span>Dopaminergic neuron loss; motor signs appear once ~30–50% of nigral neurons are gone (Popescu 2024).</span></div>
-      <div class="kv"><b>Intervention</b><span>Aerobic exercise raises dopamine D2-receptor binding &amp; BDNF and delays progression (Petzinger 2013, Lancet Neurol); meditation raises dopamine (2nd paper).</span></div>`;
+      <div class="kv"><b>Intervention</b><span>Aerobic exercise raises dopamine D2-receptor binding &amp; BDNF and delays progression (Petzinger 2013, Lancet Neurol); meditation raises dopamine (2nd paper).</span></div>
+      <div class="kv"><b>Axon shade</b><span>As dopamine output falls, the nigrostriatal axons darken, a darker axon is sending less dopamine to the striatum, and the yellow dopamine particles visibly travel slower along it.</span></div>`;
   } else {
     const burden=+$('#burden').value, clear=+$('#clear').value;
     $('#vBurden').textContent=burden+'%'; $('#vClear').textContent=clear+'%';
@@ -724,7 +726,7 @@ function animatePath(){
   if(path.pview==='park'){
     const a=(path._tremor||0)*0.055, t=Date.now();
     path.park.position.x=Math.sin(t*0.03)*a; path.park.position.y=Math.cos(t*0.037)*a;
-    path.dopa.forEach(d=>{ if(!d.on){d.m.visible=false;return;} d.m.visible=true; d.t=(d.t+d.speed)%1; d.m.position.copy(d.curve.getPoint(d.t)); });
+    path.dopa.forEach(d=>{ if(!d.on){d.m.visible=false;return;} d.m.visible=true; d.t=(d.t+d.speed*(path._speedF||1))%1; d.m.position.copy(d.curve.getPoint(d.t)); });
   }
   path.r.render(path.scene,path.cam);
 }
@@ -736,15 +738,14 @@ function isActive(tab){ return $('#tab-'+tab).classList.contains('active'); }
 function refresh(){
   state.o3=+$('#o3').value/100; state.ex=+$('#ex').value/100;
   state.cst=+$('#cst').value/100; state.med=+$('#med').value/100;
-  state.apoe=+$('#apoe').value; state.synOn=$('#synOn').checked; state.month=+$('#month').value; state.pd=$('#pdMode').checked;
+  state.apoe=+$('#apoe').value; state.month=+$('#month').value; state.pd=$('#pdMode').checked;
   $('#vO3').textContent=$('#o3').value+'%'; $('#vEx').textContent=$('#ex').value+'%';
   $('#vCst').textContent=$('#cst').value+'%'; $('#vMed').textContent=$('#med').value+'%';
   $('#vApoe').textContent=$('#apoe').value; $('#monthLbl').textContent=state.month;
   const tr = trajectory(state);
-  const base = trajectory({...state, o3:0, ex:0, cst:0, med:0, synOn:false});
+  const base = trajectory({...state, o3:0, ex:0, cst:0, med:0});
   brain._tr = tr;
   drawChart(tr, base); buildGauges(tr); updateBrain(); updateValidation(tr); buildScoreboard(tr, base);
-  $('#synVal').textContent = tr.syn.toFixed(1); $('#synBar').style.width=(K.syn ? tr.syn/K.syn*100 : 0)+'%';
 }
 const GAUGES=[
   {k:'cog',   lab:'Cognition (MMSE)', max:30, good:true},
@@ -810,7 +811,6 @@ const K_META=[
   ['plaqueGrow','Amyloid accrual rate',                 0, 3,   .05],
   ['cstCog',    'CST → cognition (Woods 2023 Cochrane)',0, 0.5, .01],
   ['medCog',    'Meditation → cognition (Shi 2025)',    0, 0.5, .01],
-  ['syn',       'Synergy coefficient (SYN)',            0, 30,  1],
 ];
 function buildKSliders(){
   $('#kSliders').innerHTML = K_META.map(([k,lab,mn,mx,st])=>`
@@ -864,10 +864,10 @@ const BENCH=[
   { label:'Exercise only · Erickson et al. 2011 RCT (n=120)',
     match:{o3:0,ex:70,cst:0,med:0}, hippo:4.0, mmse:-3.4,
     note:'+2%/yr hippocampal volume from aerobic walking, in HEALTHY older adults (population mismatch), extrapolated to 24 mo. MMSE endpoint approximated as decline slowed ~30% vs. untreated, no AD RCT reports this directly.' },
-  { label:'Multi-domain · Köbe et al. 2016 + FINGER 2015',
-    match:{o3:80,ex:80,cst:75,med:50}, hippo:0, mmse:0,
-    note:'Köbe: gray matter preserved over 6 mo in MCI (ω-3 + aerobic + cognitive stimulation). FINGER: cognition stabilized vs. control over 2 yr (composite battery, not MMSE). Δ≈0 = "hold the line", an approximation of both.' },
 ];
+/* Multi-domain benchmark removed 2026-09-10: no published trial combines all
+   four interventions, so its Δ=0 "endpoints" were placeholders, not data —
+   they produced misleading residuals whenever several sliders were raised. */
 function updateValidation(tr){
   const el=$('#validPanel'); if(!el) return;
   const s={o3:+$('#o3').value, ex:+$('#ex').value, cst:+$('#cst').value, med:+$('#med').value};
@@ -895,7 +895,7 @@ function updateValidation(tr){
     </table>
     <div class="g" style="margin-top:10px"><div class="gt"><b>Model–trial agreement</b><span class="gv">${agree.toFixed(0)} / 100</span></div>
       <div class="bar"><i style="width:${agree}%;background:${agree>65?'var(--good)':agree>35?'var(--warn)':'var(--bad)'}"></i></div></div>
-    <p class="hint" style="margin:9px 0 0">${best.note}${pdNote} Residual = simulated − trial. The agreement score normalizes each residual by a plausible clinical range (heuristic, not a fitted statistic).</p>`;
+    <p class="hint" style="margin:9px 0 0">${best.note}${pdNote} Residual = simulated − trial. The agreement score normalizes each residual by a plausible clinical range (heuristic, not a fitted statistic). This table checks how well the simulation's <i>rate of change</i> matches the trial's, not whether the disease itself is reversed, in the untreated scenario the trial endpoint is a decline the model is trying to match, not beat. No published trial combines all four interventions, so there is no benchmark for the full-combination scenario, with several sliders raised, the panel compares against the closest single-intervention trial and the residual should be read as "beyond what that trial tested", not as error.</p>`;
 }
 
 /* ---- batch simulation sweep + CSV export ---- */
@@ -918,7 +918,7 @@ function runBatch(){
   $('#dlCsv').disabled=false;
 }
 
-const PRESETS={ none:{o3:0,ex:0,cst:0,med:0}, single:{o3:0,ex:70,cst:0,med:0}, synergy:{o3:80,ex:80,cst:75,med:50} };
+const PRESETS={ none:{o3:0,ex:0,cst:0,med:0}, single:{o3:0,ex:70,cst:0,med:0}, combo:{o3:80,ex:80,cst:75,med:50} };
 function applyPreset(p){ const v=PRESETS[p];
   $('#o3').value=v.o3; $('#ex').value=v.ex; $('#cst').value=v.cst; $('#med').value=v.med; refresh(); }
 let playing=null;
@@ -930,7 +930,7 @@ function togglePlay(){
 function initSci(){
   $('#sciProse').innerHTML = `
   <h2>How the model works</h2>
-  <div class="note">This is a transparent, phenomenological teaching model, not a validated clinical predictor. Every <b>direction</b> of effect is grounded in the literature reviewed in the two papers; the <b>magnitudes</b> are illustrative and fully editable (see "Tune coefficients"). Use it to explore mechanisms and the synergy hypothesis, not to make health decisions.</div>
+  <div class="note">This is a transparent, phenomenological teaching model, not a validated clinical predictor. Every <b>direction</b> of effect is grounded in the literature reviewed in the two papers; the <b>magnitudes</b> are illustrative and fully editable (see "Tune coefficients"). Use it to explore mechanisms, not to make health decisions.</div>
   <h3>Interventions → biomarkers → structure → cognition</h3>
   <p>Each month, four intervention doses drive three primary biomarkers, <b>BDNF</b>, <b>cerebral blood flow/VEGF</b>, and <b>neuroinflammation</b>, which set a <b>neurogenesis rate</b> and a composite <b>Neuroplasticity Index</b>. These integrate over 24 months into <b>hippocampal volume</b> (atrophy vs. regrowth) and <b>amyloid plaque load</b> (accrual vs. clearance), which in turn move a <b>cognition</b> score (MMSE-like, 0–30). CST also adds a direct executive-function gain.</p>
   <h3>Effect directions (verified)</h3>
@@ -941,13 +941,13 @@ function initSci(){
     <li><b>Meditation</b>, ↓ stress/inflammation, supports dopamine & connectivity.</li>
     <li><b>APOE4</b>, accelerates atrophy & plaque growth (risk factor 1.0/1.45/1.90× for 0/1/2 copies).</li>
   </ul>
-  <h3>The synergy hypothesis</h3>
-  <p>Your central claim: these treatments are rarely studied <i>together</i>. The model adds a cross-product bonus, proportional to the products of intervention pairs, so a balanced multi-modal plan out-performs the sum of single treatments. Toggle it off to see the difference.</p>
-  <div class="note">Coefficients recalibrated 2026-07-12 against real meta-analyses and RCTs (see <code>W</code> object in <code>app.js</code> for full per-coefficient citations, effect sizes, and confidence/population-match flags). Several placeholders were substantially larger than the literature supports and have been reduced, most real intervention→biomarker effects are small-to-moderate, not the dramatic swings the original placeholders implied. The synergy multiplier (SYN) has <i>no</i> dedicated interaction-effect study to calibrate against anywhere in the literature searched, it remains this model's explicit, labeled hypothesis, not a measured quantity.</div>
+  <h3>Why there is no synergy term</h3>
+  <p>Earlier versions added a cross-product "synergy bonus" when several interventions were combined. It was removed: no published trial combines all four of these interventions, so there is no data to calibrate an interaction effect against (FINGER 2015 has no factorial arms isolating each domain). Combining sliders still helps in the model, but only as the sum of each intervention's own literature-derived effect.</p>
+  <div class="note">Coefficients recalibrated 2026-07-12 against real meta-analyses and RCTs (see <code>W</code> object in <code>app.js</code> for full per-coefficient citations, effect sizes, and confidence/population-match flags). Several placeholders were substantially larger than the literature supports and have been reduced, most real intervention→biomarker effects are small-to-moderate, not the dramatic swings the original placeholders implied.</div>
   <h3>Supporting research (external, peer-reviewed &amp; institutional)</h3>
   <p>The two companion papers are backed by published studies and by federal/university Alzheimer's research bodies, not just self-reviewed literature:</p>
   <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/26433119/" target="_blank" rel="noopener">Köbe et al., <i>NeuroImage</i> (2016), combined omega-3 + aerobic exercise + cognitive stimulation prevents gray-matter decline in MCI</a>
-    <p>RCT, 22 MCI patients age 60–80: 6 months of omega-3 + aerobic cycling + cognitive stimulation (n=13) vs. omega-3 + non-aerobic stretching (n=9). Combined group preserved/grew gray matter in frontal, parietal &amp; cingulate cortex; controls declined. Backs this simulator's three-intervention synergy mechanic.</p>
+    <p>RCT, 22 MCI patients age 60–80: 6 months of omega-3 + aerobic cycling + cognitive stimulation (n=13) vs. omega-3 + non-aerobic stretching (n=9). Combined group preserved/grew gray matter in frontal, parietal &amp; cingulate cortex; controls declined. Evidence that stacking several interventions is worthwhile, though it cannot separate each one's contribution.</p>
     <span class="src">PubMed 26433119</span></div>
   <div class="cite"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5368208/" target="_blank" rel="noopener">Hilton et al., <i>Annals of Behavioral Medicine</i> (2016), mindfulness meditation for chronic pain: systematic review &amp; meta-analysis</a>
     <p>38 RCTs / 3,536 participants. Small but statistically significant reduction in pain plus improved depression &amp; quality of life (evidence graded low-to-moderate). Backs the meditation slider's role in the chronic-illness pain model.</p>
@@ -990,17 +990,16 @@ function boot(){
     setTimeout(()=>{ brain.onR&&brain.onR(); apoe.onR&&apoe.onR(); path.onR&&path.onR(); },30);
   });
   ['o3','ex','cst','med','apoe','month'].forEach(id=>$('#'+id).oninput=refresh);
-  $('#synOn').onchange=refresh;
   $('#play').onclick=togglePlay;
   document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));
   $('#viewSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
   $('#isoSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>setIso(+b.dataset.iso));
   $('#fixOn').onchange=e=>{ apoe.fix=e.target.checked; updateFixState(); updateApoe(); };
-  ['dissect','ghost'].forEach(id=>$('#'+id).oninput=()=>{setDissect(+$('#dissect').value);setGhost(+$('#ghost').value);updateInnerVis();});
-  $('#brainReset').onclick=()=>{$('#dissect').value=100;$('#ghost').value=100;setDissect(100);setGhost(100);updateInnerVis();brain.cam.position.set(3.2,1.1,4.4);};
+  ['dissect','ghost'].forEach(id=>$('#'+id).oninput=()=>{setDissect(+$('#dissect').value);setGhost(+$('#ghost').value);updateInnerVis();updateViewTag();});
+  $('#brainReset').onclick=()=>{setRange($('#dissect'),100);setRange($('#ghost'),15);setDissect(100);setGhost(15);updateInnerVis();updateViewTag();brain.cam.position.set(3.2,1.1,4.4);};
   $('#pathSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>setPview(b.dataset.pview));
   ['loss','rescue','burden','clear'].forEach(id=>$('#'+id).oninput=refreshPath);
-  $('#simReset').onclick=()=>{ $('#o3').value=60;$('#ex').value=60;$('#cst').value=60;$('#med').value=30;$('#apoe').value=1;$('#month').value=0;$('#synOn').checked=true; refresh(); };
+  $('#simReset').onclick=()=>{ $('#o3').value=60;$('#ex').value=60;$('#cst').value=60;$('#med').value=30;$('#apoe').value=1;$('#month').value=0; refresh(); };
   $('#apoeReset').onclick=()=>{ $('#fixOn').checked=false; apoe.fix=false; setIso(3); setView('dna'); };
   $('#pathReset').onclick=()=>{ $('#loss').value=55;$('#rescue').value=40;$('#burden').value=60;$('#clear').value=30; setPview('park'); };
   $('#pdMode').onchange=refresh;

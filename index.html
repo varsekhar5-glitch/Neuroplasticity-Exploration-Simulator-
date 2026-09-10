@@ -80,16 +80,17 @@
           <h3><span class="dot"></span>Living brain, 24-month projection</h3>
           <p class="hint">Default trajectory: <b>untreated early-stage Alzheimer's</b> (hippocampal atrophy, amyloid plaque, cognition decline). This is what your intervention sliders act on. Check <b>Parkinson's mode</b> below to additionally layer in substantia nigra dopamine decline. Drag to rotate · scroll to zoom. Use <b>X-ray cortex</b> + <b>Cross-section</b> to dissect inward and reveal the thalamus, basal ganglia, substantia nigra, ventricles, corpus callosum &amp; hippocampus. Everything reacts live to your interventions and the month scrubber.</p>
           <div class="viewport" id="brainVP">
-            <div class="vp-tag">Left lateral view · sagittal</div>
+            <div class="vp-tag" id="brainViewTag">Left lateral view · whole brain</div>
             <div class="vp-tag tr" id="brainMonthTag">Month 0</div>
           </div>
           <div class="vpctl">
-            <label title="Fade the cortex to translucent to see structures underneath">X-ray cortex <input type="range" id="ghost" min="15" max="100" value="100"></label>
-            <label title="Slice the brain open with a clipping plane">Cross-section <input type="range" id="dissect" min="0" max="100" value="100"></label>
-            <div class="seg" id="sectSeg">
-              <button data-sect="sagittal" class="active" title="Side-on view, dividing left/right">Sagittal</button>
-              <button data-sect="coronal" title="Front-on view, dividing front/back">Coronal</button>
-              <button data-sect="axial" title="Top-down view, dividing top/bottom">Axial</button>
+            <label title="Slide right to fade the cortex transparent and reveal the structures underneath">X-ray cortex <input type="range" id="ghost" min="15" max="100" value="15"></label>
+            <span class="vsep" aria-hidden="true"></span>
+            <label title="Slide left to slice the brain open along the plane chosen with the Sagittal / Coronal / Axial buttons">Cross-section <input type="range" id="dissect" min="0" max="100" value="100"></label>
+            <div class="seg" id="sectSeg" title="Pick which plane the Cross-section slider cuts along">
+              <button data-sect="sagittal" class="active" title="Cross-section cuts side-on, dividing left/right">Sagittal</button>
+              <button data-sect="coronal" title="Cross-section cuts front-on, dividing front/back">Coronal</button>
+              <button data-sect="axial" title="Cross-section cuts top-down, dividing top/bottom">Axial</button>
             </div>
             <label class="toggle" title="Layers substantia nigra dopamine decline on top of the default Alzheimer's trajectory"><input type="checkbox" id="pdMode"> Parkinson's mode (off by default, adds dopamine decline)</label>
             <button class="btn" id="brainReset" style="padding:5px 12px" title="Reset X-ray, cross-section & camera to defaults">Reset</button>
@@ -108,7 +109,7 @@
 
         <div class="card">
           <h3><span class="dot"></span>Trajectories vs. no-intervention baseline</h3>
-          <p class="hint">Solid = your plan · dashed = untreated early AD. Toggle series below.</p>
+          <p class="hint">Solid = your plan · dashed = untreated early AD. Toggle series below. X-axis: time in months (0–24). Y-axis: each series as a percent of its own scale max, so cognition (MMSE, out of 30) at 100% = a perfect 30.</p>
           <canvas class="chart" id="chart" width="900" height="190"></canvas>
           <div class="legend" id="chartLegend"></div>
         </div>
@@ -169,7 +170,7 @@
           <div class="row" style="margin-top:6px">
             <button class="btn" data-preset="none" title="Set every intervention to 0%">Untreated</button>
             <button class="btn" data-preset="single" title="Aerobic exercise only, others at 0%">Exercise only</button>
-            <button class="btn primary" data-preset="synergy" title="All four interventions high, shows the synergy hypothesis">Full synergy</button>
+            <button class="btn primary" data-preset="combo" title="All four interventions high">All four combined</button>
             <button class="btn reset" id="simReset" title="Reset all sliders to defaults">↺ Reset</button>
           </div>
         </div>
@@ -182,24 +183,33 @@
 
         <div class="card">
           <h3><span class="dot"></span>Plain-English scoreboard, your plan vs. doing nothing</h3>
-          <p class="hint">Each row compares the brain on <b>your plan</b> against the same brain with <b>no treatment at all</b>, at the month on the scrubber. The last column is the percent difference: ▲ green means your plan made that factor better, ▼ red means worse. Levels are on a 0–100 scale (like a fuel gauge); the memory test is out of 30.</p>
+          <p class="hint">Each row compares the brain on <b>your plan</b> against the same brain with <b>no treatment at all</b>, at the month on the scrubber. The last column is the percent difference: ▲ green means your plan made that factor better, ▼ red means worse. Levels are on a 0–100 scale (like a fuel gauge); the memory test is out of 30. <b>Read this as delay, not reversal:</b> a green ▲ on hippocampal volume means your plan is shrinking <i>slower</i> than doing nothing, not that it's growing back past 100%, check the raw number, not just the arrow.</p>
           <table class="wt" id="scoreTbl"></table>
         </div>
 
         <div class="card">
-          <h3><span class="dot"></span>Synergy term (this study's hypothesis)</h3>
-          <p class="hint">Combining treatments adds more than the sum of parts. This is the cross-product bonus your paper argues is under-researched, no dedicated interaction-effect study exists to confirm it (see Science &amp; Model Notes).</p>
-          <div class="g">
-            <div class="gt"><b>Synergy bonus to neuroplasticity</b><span class="gv" id="synVal">0</span></div>
-            <div class="bar"><i id="synBar" style="width:0%;background:var(--accent)"></i></div>
+          <h3><span class="dot"></span>Key terms, for newcomers to the field</h3>
+          <p class="hint">The words this simulator uses most, so you can follow along without a neuroscience background.</p>
+          <div class="infoblk">
+            <div class="kv"><b>Neuroplasticity</b><span>The brain's ability to rewire and strengthen its own connections in response to what you do.</span></div>
+            <div class="kv"><b>BDNF</b><span>Brain-derived neurotrophic factor, a "fertilizer" protein that helps neurons grow, connect &amp; survive. Higher is better.</span></div>
+            <div class="kv"><b>Hippocampus</b><span>The brain's memory center; it shrinks (atrophies) early in Alzheimer's.</span></div>
+            <div class="kv"><b>Amyloid-β plaques</b><span>Sticky protein clumps that build up between neurons in Alzheimer's, a negative factor; lower is better.</span></div>
+            <div class="kv"><b>Tau tangles</b><span>Twisted tau protein inside neurons that collapses their internal transport, the other AD hallmark (see Pathology Lab).</span></div>
+            <div class="kv"><b>Neuroinflammation</b><span>Irritation of brain tissue by overactive immune cells; chronic inflammation worsens the disease.</span></div>
+            <div class="kv"><b>Cerebral blood flow</b><span>Oxygen &amp; nutrient delivery to brain tissue; exercise raises it, low flow starves neurons.</span></div>
+            <div class="kv"><b>MMSE</b><span>Mini-Mental State Exam, a 30-point memory &amp; thinking test; the "cognition" score used here.</span></div>
+            <div class="kv"><b>APOE4</b><span>A gene variant raising Alzheimer's risk (~2–3× with one copy, ~8–12× with two) by speeding plaque buildup &amp; atrophy.</span></div>
+            <div class="kv"><b>Dopamine / substantia nigra</b><span>Dopamine is a movement-and-reward chemical made in the substantia nigra; losing it causes Parkinson's symptoms.</span></div>
+            <div class="kv"><b>Atrophy</b><span>Loss of brain tissue over time, what the interventions try to slow.</span></div>
           </div>
-          <label class="toggle" style="margin-top:10px" title="Toggle the cross-product synergy bonus on/off"><input type="checkbox" id="synOn" checked> Enable synergy interactions</label>
-          <details>
-            <summary title="Edit the literature-derived model weights directly">Tune model coefficients</summary>
-            <p class="hint" style="margin:8px 0 10px">Top table: literature-derived intervention → biomarker weights (citations in <code>app.js</code>). Sliders below: structural model coefficients, drag them during a live demo for sensitivity analysis; the trajectory graph, gauges &amp; 3D brain all recalculate instantly.</p>
-            <table class="wt" id="coefTbl"></table>
-            <div id="kSliders" style="margin-top:14px"></div>
-          </details>
+        </div>
+
+        <div class="card">
+          <h3><span class="dot"></span>Tune model coefficients</h3>
+          <p class="hint">Top table: literature-derived intervention → biomarker weights (citations in <code>app.js</code>). Sliders below: structural model coefficients, drag them during a live demo for sensitivity analysis; the trajectory graph, gauges &amp; 3D brain all recalculate instantly.</p>
+          <table class="wt" id="coefTbl"></table>
+          <div id="kSliders" style="margin-top:14px"></div>
         </div>
       </div>
     </div>

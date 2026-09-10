@@ -266,3 +266,6 @@ canvas.chart{width:100%;height:190px;display:block}
 @media(max-width:600px){
   .intro-modules span{font-size:9.5px;padding:5px 10px}
 }
+
+/* divider between the X-ray and Cross-section slider groups */
+.vpctl .vsep{width:1px;align-self:stretch;min-height:22px;background:var(--line)}
