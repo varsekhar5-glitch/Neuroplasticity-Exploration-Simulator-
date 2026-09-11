@@ -297,16 +297,16 @@
       <div>
         <div class="card" id="parkCtl">
           <h3><span class="dot"></span>Parkinson's, nigrostriatal dopamine</h3>
-          <p class="hint">Substantia nigra dopaminergic neurons die → dopamine falls → tremor &amp; rigidity. Aerobic exercise &amp; meditation partly restore dopamine and slow decline (2nd paper: John Pepper).</p>
-          <div class="ctrl"><label>Substantia nigra neuron loss <span class="val" id="vLoss">55%</span></label><input type="range" id="loss" min="0" max="90" value="55"><div class="desc">Progressive nigral degeneration, the core PD lesion. Motor symptoms appear after ~30–50% of nigral neurons (50–60% of their striatal connections) are lost (Popescu 2024).</div></div>
-          <div class="ctrl"><label>Aerobic exercise + meditation <span class="val" id="vRescue">40%</span></label><input type="range" id="rescue" min="0" max="100" value="40"><div class="desc">↑ dopamine, ↑ BDNF, delays motor progression.</div></div>
+          <p class="hint">Substantia nigra dopaminergic neurons die → dopamine falls → tremor &amp; rigidity. Aerobic exercise raises striatal dopamine release &amp; BDNF and eases motor symptoms (Sacheli 2019; van der Kolk 2019); meditation eases motor scores in some trials without evidence of a dopamine effect (Kwok 2025).</p>
+          <div class="ctrl"><label>Substantia nigra neuron loss <span class="val" id="vLoss">55%</span></label><input type="range" id="loss" min="0" max="90" value="55"><div class="desc">Progressive nigral degeneration, the core PD lesion. Motor symptoms appear after ~30% of nigral neurons but 50–70% of their putamen terminals are lost (Cheng 2010; Popescu 2024); putamen terminals are virtually gone by 4 years post-diagnosis (Kordower 2013).</div></div>
+          <div class="ctrl"><label>Aerobic exercise + mind-body training <span class="val" id="vRescue">40%</span></label><input type="range" id="rescue" min="0" max="100" value="40"><div class="desc">↑ striatal dopamine release, ↑ BDNF (SMD 1.2), −4 to −6 UPDRS-III pts at 6 mo; a symptomatic offset, not proven disease modification.</div></div>
           <div class="gauges" id="parkGauges"></div>
         </div>
         <div class="card" id="molCtl" style="display:none">
           <h3><span class="dot"></span>Molecular AD, plaques &amp; tangles</h3>
           <p class="hint">Extracellular amyloid-β fibrils clump into senile plaques; intracellular tau detaches from microtubules into neurofibrillary tangles, collapsing transport.</p>
           <div class="ctrl"><label>Plaque + tau burden <span class="val" id="vBurden">60%</span></label><input type="range" id="burden" min="0" max="100" value="60"><div class="desc">Higher = more Aβ fibrils, more tangles, destabilized microtubules.</div></div>
-          <div class="ctrl"><label>Clearance (omega-3 + exercise + anti-amyloid) <span class="val" id="vClear">30%</span></label><input type="range" id="clear" min="0" max="100" value="30"><div class="desc">Reduces amyloid load, tau, and oxidative stress.</div></div>
+          <div class="ctrl"><label>Clearance (anti-amyloid therapy) <span class="val" id="vClear">30%</span></label><input type="range" id="clear" min="0" max="100" value="30"><div class="desc">Reduces amyloid load and tau. Lifestyle levers are not on this slider: omega-3 left CSF Aβ42 unchanged (Tofiq 2021) and 15 years of activity data show no amyloid effect (Slee 2024).</div></div>
           <div class="gauges" id="molGauges"></div>
         </div>
         <div class="card"><h3><span class="dot"></span>What you're looking at</h3><div class="infoblk" id="pathInfo"></div></div>

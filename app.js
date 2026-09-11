@@ -43,16 +43,24 @@ const W = {
     // (small, p=0.005). Confidence: high (study quality) / medium (generalizability).
     // MISMATCH: healthy/mixed-age adult samples, no AD-specific trials. g×20=5.6→6.
     ex: 6,
+    // PARKINSON'S-MODE OVERRIDE (2026-09-11): Kaagman, van Wegen et al. 2024, Brain
+    // Sciences 14(3):194. RCT-only meta-analysis, 5 RCTs, n=216, PD patients.
+    // Aerobic exercise → serum BDNF: SMD=1.20 [0.53, 1.87], p=0.0004, I²=77%.
+    // PD patients respond ~4× more than healthy adults (g=0.28 above), plausibly
+    // because PD baseline BDNF is depressed (Zhao 2025 meta: SMD −1.04 vs controls).
+    // Used instead of `ex` when Parkinson's mode is on. SMD×20=24.
+    exPd: 24,
     // Ziaei et al. 2024, Nutritional Neuroscience 27(7):715-725. Meta-analysis,
     // 12 RCTs, n=587. Omega-3 → BDNF: SMD=0.72 (moderate-large), I²=84%.
     // Confidence: medium (high heterogeneity). MISMATCH: mixed clinical populations
     // (CVD, T2DM, depression, schizophrenia) — no AD trials in the pool; a separate
     // AD-specific RCT (PMC4632767) found NO cognitive/mood benefit. SMD×20=14.4→14.
     o3: 14,
-    // No direct CST→BDNF evidence found — Woods/Spector Cochrane review (37 RCTs,
-    // n=2,766) is silent on this outcome. Kept small, reflecting the model's existing
-    // "weaker molecular effect" framing for CST. This is an EVIDENCE GAP, not a
-    // confirmed null result — flag accordingly if surfaced in the UI.
+    // Nicastri et al. 2022, Alzheimer's & Dementia (N Y) 8(1):e12337 (PMID 36089933).
+    // RCT, n=144 healthy older adults, 4 arms. ONLY the cognitive-training arm raised
+    // serum BDNF (t(36)=2.58, p=0.01); mindfulness and exercise arms did not. Direction
+    // confirmed (2026-09-11), but no means/SD were published, so no effect size can be
+    // extracted — magnitude kept small. Woods 2023 Cochrane is silent on BDNF.
     cst: 2,
     // Frontiers in Psychology 2020 (PMC7522212). Meta-analysis, 8 RCTs, n=479.
     // Meditation → BDNF: SMD=0.72, I²=78%. Confidence: LOW-medium (small n, high
@@ -77,19 +85,23 @@ const W = {
     // No claimed/plausible direct CBF pathway for CST — structural zero, not an
     // evidence gap (CST is a cognitive/behavioral intervention, not vascular).
     cst: 0,
-    // No quantified chronic CBF effect found for meditation. Wang et al. 2011
-    // (Psychiatry Res: Neuroimaging, n=10) found unquantified regional CBF shifts;
-    // Kjaer et al. 2002 measured acute striatal DOPAMINE release, not CBF, in n=8
-    // expert meditators. EVIDENCE GAP — kept small pending a real chronic-CBF trial.
+    // Newberg et al. 2010, J Alzheimer's Disease 20(2):517-526 (PMID 20164557):
+    // 8 weeks Kirtan Kriya in n=14 with memory loss → significant prefrontal/parietal
+    // CBF increase on SPECT (p<0.05), but NO percent-change published and no control
+    // arm. Wang 2011 (n=10) likewise unquantified. Direction confirmed, magnitude an
+    // assumption — kept small pending a controlled chronic-CBF trial.
     med: 2,
   },
   inflam: {
     base: 52, // untreated early-AD starting point (model assumption, not literature)
-    // Meta-analysis of long-term exercise training, 38 studies, n=2,557 healthy
-    // subjects. Exercise → CRP: SMD=-0.18 (95% CI -0.31 to -0.06, p=0.005) — small
-    // but significant. Confidence: medium-high. MISMATCH: healthy subjects, not
-    // AD/inflammatory-disease-specific. SMD×20=-3.6→-4.
-    ex: -4,
+    // RECALIBRATED 2026-09-11: Hong, Wang et al. 2026, Frontiers in Medicine 13:1889076
+    // (PMID 42625625). Bayesian network meta-analysis, 54 RCTs, n=2,836, adults ≥60.
+    // Aerobic exercise → CRP: SMD=-0.73 (95% CI -1.17 to -0.29). Older-adult population
+    // is a far better match than the previous all-age meta (SMD -0.18, n=2,557 → -4).
+    // Confidence: medium (abstract reports -0.83, results text -0.73; the smaller
+    // value is used). Akalp 2024 (MCI meta) agrees on direction: TNF-α SMD -0.48
+    // [-0.82, -0.13]. SMD×20=-14.6→-15.
+    ex: -15,
     // Li, Huang, Zheng & Wu 2014, PLOS ONE 9(2):e88103. Meta-analysis, 68 RCTs,
     // n=4,601 (healthy subgroup: 17 studies). Omega-3 → CRP (healthy subgroup):
     // -16.5% (95% CI -0.28 to -0.08 mg/L, p=0.001). Confidence: medium (high
@@ -117,13 +129,29 @@ const W = {
    for sensitivity analysis. K_DEF holds the defaults (values documented above
    and in trajectory() comments); K is the live copy the sliders mutate. */
 const K_DEF = {
-  apoeRisk: 0.45,   // APOE-ε4 degradation multiplier per allele copy
+  /* STRUCTURAL REFIT 2026-09-11. apoeRisk, atrophy, the inflammation→hippocampus
+     penalty and the brain→cognition mapping in trajectory() were grid-fitted
+     (research/ scratch script, least squares) so the UNTREATED run reproduces the
+     published 24-month endpoints instead of overshooting them ~3×:
+       target  hippocampus −9.3 % (Barnes & Fox 2009, −4.66 %/yr AD meta-analysis)
+       target  MMSE −6.6 pts (Han 2000, −3.3 pts/yr, 37 studies n=3,492)
+       target  APOE-ε4 spread ±1.1 %/yr hippocampus per copy (Schuff 2009 ADNI:
+               −1.4 %/yr extra in ε4 AD; Cai 2026 meta: −34 mm³/yr ≈ −1 %/yr per copy)
+     Before the refit the untreated ε4×1 run lost 28 % hippocampus and 14 MMSE pts.
+     Fitted values: apoeRisk 0.45→0.35, atrophy 0.75→0.26, inflam→hippo 0.004→0.003,
+     cognition (hippo 0.03→0.01, plaque 0.014→0.004, constant 0.07→0.14). */
+  apoeRisk: 0.35,   // APOE-ε4 atrophy/accrual multiplier per allele copy (×1.35, ×1.70): 0.26×0.35 ≈ 1.1 %/yr extra
   nBdnf: 0.5,       // BDNF → neuroplasticity weight (drives hippocampal regrowth)
   nCbf: 0.3,        // cerebral blood flow → neuroplasticity weight
   nInflam: 0.35,    // neuroinflammation penalty on neuroplasticity
   regrow: 1.15,     // hippocampal regrowth rate (per month, × neuroplasticity)
-  atrophy: 0.75,    // hippocampal atrophy rate (per month, × APOE factor)
-  plaqueGrow: 0.9,  // amyloid accrual rate (per month, × APOE factor)
+  atrophy: 0.26,    // hippocampal atrophy rate (per month, × APOE factor); net of regrowth ≈ −4.7 %/yr untreated
+  // Amyloid accrual rate (per month, × APOE factor), RECALIBRATED 2026-09-11 (0.9 → 0.35).
+  // Villemagne et al. 2013 (Lancet Neurol, n=200 serial PiB): accumulators gain
+  // 0.043 SUVR/yr [0.037, 0.049] ≈ 4 centiloids/yr; Bollack 2024 (AMYPAD n=750):
+  // 1.5 CL/yr overall, ~4.4 CL/yr in converters. Treating 1 model point ≈ 1 CL,
+  // 0.35/mo ≈ 4.2/yr. The old 0.9/mo (≈11/yr) was ~3× too fast.
+  plaqueGrow: 0.35,
   // CST → cognition, RECALIBRATED 2026-09-08: Woods et al. 2023 Cochrane update
   // (25 studies, n=1,893) reports MMSE +1.99 pts [1.24, 2.74] vs usual care.
   // 0.08/mo × 24 mo ≈ +1.9 pts at 100% dose (previous hardcoded 0.33 implied
@@ -139,30 +167,63 @@ const state = { o3:.6, ex:.6, cst:.6, med:.3, apoe:1, month:0 };
 
 function trajectory(p){
   const apoeF = 1 + p.apoe*K.apoeRisk;
-  const out = { bdnf:[], cbf:[], inflam:[], neuro:[], hippo:[], plaque:[], cog:[], npi:[], dopa:[] };
-  let hippo = 100, plaque = 28 + p.apoe*11, cog = 24, dopa = 88;
+  const out = { bdnf:[], cbf:[], inflam:[], neuro:[], hippo:[], plaque:[], cog:[], npi:[], dopa:[], updrs:[] };
+  let hippo = 100, plaque = 28 + p.apoe*4, cog = 24, dopa = 88;   // plaque ≈ centiloids; ε4 carriers start higher (refit 11→4/copy)
+  // MDS-UPDRS-III (PD motor score, higher = worse). Baseline 20.9 = PPMI de novo
+  // mean (Simuni 2018, n=423). Untreated slope +2.4 pts/yr (Holden 2018, PPMI n=362).
+  const UPDRS0 = 20.9, updrsSlope = 2.4/12;
   for(let m=0; m<=MONTHS; m++){
-    const bdnf   = clamp(W.bdnf.base + p.ex*W.bdnf.ex + p.o3*W.bdnf.o3 + p.cst*W.bdnf.cst + p.med*W.bdnf.med, 0, 100);
+    const bdnf   = clamp(W.bdnf.base + p.ex*(p.pd?W.bdnf.exPd:W.bdnf.ex) + p.o3*W.bdnf.o3 + p.cst*W.bdnf.cst + p.med*W.bdnf.med, 0, 100);
     const cbf    = clamp(W.cbf.base  + p.ex*W.cbf.ex  + p.o3*W.cbf.o3  + p.med*W.cbf.med, 0, 100);
     const inflam = clamp(W.inflam.base + p.ex*W.inflam.ex + p.o3*W.inflam.o3 + p.med*W.inflam.med + p.apoe*8, 0, 100);
     const neuro  = clamp((bdnf*K.nBdnf + cbf*K.nCbf - inflam*K.nInflam), 0, 100);
     const npi    = clamp(0.34*bdnf + 0.22*neuro + 0.18*cbf + 0.26*(100-inflam), 0, 100);
     out.bdnf.push(bdnf); out.cbf.push(cbf); out.inflam.push(inflam); out.neuro.push(neuro); out.npi.push(npi);
     out.hippo.push(hippo); out.plaque.push(plaque); out.cog.push(cog); out.dopa.push(dopa);
+    // Symptomatic motor offsets, reached over 6 months then held (not a slope change:
+    // SPARX 2018 was null on slope, SPARX3 unpublished). Exercise −4.2 pts [−6.9, −1.6]
+    // at 6 mo (van der Kolk 2019 Park-in-Shape RCT, n=130; Cochrane 2024 endurance
+    // MD −5.76 agrees). Meditation capped at 0.6× exercise: Cochrane 2024 mind-body
+    // −3.62 [−7.24, 0.00] is 63% of endurance with CI touching zero; Kwok 2025
+    // seated-meditation RCT −4.0 at 6 mo but unblinded vs usual care; Advocat 2016 null.
+    const motorOffset = (4.2*p.ex + 2.5*p.med) * Math.min(m,6)/6;
+    out.updrs.push(p.pd ? UPDRS0 + updrsSlope*m - motorOffset : 0);
     const atrophy   = K.atrophy * apoeF;
     const regrow    = neuro/100 * K.regrow;
-    hippo  = clamp(hippo - atrophy + regrow - inflam*0.004, 55, 108);
+    hippo  = clamp(hippo - atrophy + regrow - inflam*0.003, 55, 108);
     const growth    = K.plaqueGrow * apoeF;
-    const clearance = (p.o3*0.55 + p.ex*0.5) * (1 + p.apoe*0.3);
-    plaque = clamp(plaque + growth - clearance, 0, 100);
-    const fromBrain = (hippo-90)*0.03 - (plaque-30)*0.014;
-    cog = clamp(cog + fromBrain + p.cst*K.cstCog + p.med*K.medCog - 0.07*apoeF, 0, 30);
-    // nigral dopamine loss, RECALIBRATED 2026-09-08: Marek et al. 2001 (Neurology,
-    // serial DAT SPECT, n=56) measured −11.2%/yr striatal dopaminergic loss in
-    // untreated PD (0.8%/yr in healthy controls). 0.95/mo × 24 ≈ −26% of the
-    // 88-point baseline ≈ the trial's −22.4%/24mo (previous 1.9 was ~2× too steep).
-    const pdDecline = p.pd ? 0.95*(1+p.apoe*0.06) : 0.12;
-    const dopaRescue = (p.pd ? (p.ex*0.9 + p.med*0.8) : p.ex*0.2) * 0.6;  // exercise/meditation slow it (Kaagman 2024 BDNF SMD 1.2; Kwok 2019)
+    // Lifestyle amyloid CLEARANCE REMOVED 2026-09-11 (was (o3·0.55 + ex·0.5)·(1+0.3·ε4)):
+    //  · omega-3: Tofiq 2021 (OmegAD CSF, n=33) CSF Aβ42 unchanged, NfL/YKL-40 rose;
+    //    PreventE4 2026 (n=365) no brain-volume/cognition difference at 24 mo.
+    //  · exercise: Slee 2024 (AIBL, n=731, 15 yr) longitudinal amyloid NULL (β −0.26,
+    //    p=0.24); Okonkwo 2014 is cross-sectional with no SUVR delta.
+    //  · the ε4 boost was backwards: Arellanes 2020 found CSF EPA rose 3× MORE in
+    //    non-carriers; PreventE4 target engagement independent of ε4 (p=0.71).
+    plaque = clamp(plaque + growth, 0, 100);
+    // Exercise instead blunts amyloid's CONSEQUENCES (resilience): Rabin 2019 (JAMA
+    // Neurol, n=182) activity × amyloid interaction on cognitive decline β=0.03
+    // [0.02, 0.05], p<0.001. Modeled as up to 35% attenuation of the plaque→cognition
+    // penalty at full dose (magnitude an assumption bounded by that interaction).
+    // Brain → cognition mapping (refit 2026-09-11, see K_DEF note): volume lost since
+    // baseline and amyloid above the 30-pt threshold each drag MMSE; the constant term
+    // carries the AD decline the two structural variables do not explain (Han 2000).
+    const fromBrain = (hippo-100)*0.01 - (plaque-30)*0.004*(1-0.35*p.ex);
+    cog = clamp(cog + fromBrain + p.cst*K.cstCog + p.med*K.medCog - 0.14*apoeF, 0, 30);
+    // nigral dopamine loss, RECALIBRATED 2026-09-11 to a TWO-SLOPE decline: Simuni
+    // et al. 2018 (PPMI, n=423, serial DAT-SPECT) measured striatal binding −11.2% at
+    // 12 mo (reproducing Marek 2001) but only −17.0% cumulative at 24 mo and −27.4%
+    // at 48 mo, i.e. the loss decelerates after year 1 (Kordower 2013: most terminal
+    // collapse precedes diagnosis). Year 1: 0.82/mo (= 11.2% of the 88 baseline);
+    // year 2: 0.43/mo (the extra 5.8%). The old constant 0.95/mo gave −26%/24 mo.
+    const pdDecline = p.pd ? (m<12 ? 0.82 : 0.43) : 0.12;
+    // Exercise slows it modestly. Only human PD dopamine-imaging evidence: Sacheli 2019
+    // RCT (n=35, ↑ caudate dopamine release, p=0.04, magnitude unpublished) and Fisher
+    // 2013 (n=4 pilot, ↑ D2 binding). Magnitude here is therefore an ASSUMPTION
+    // (~25% slowing of year-1 loss at full dose). Meditation term REMOVED 2026-09-11:
+    // no PD dopamine data exist; Kjaer 2002 (+65% ventral-striatal release) was acute,
+    // in healthy meditators, and says nothing about nigral sparing. Meditation now
+    // acts on the UPDRS-III symptomatic offset above instead.
+    const dopaRescue = p.pd ? p.ex*0.2 : p.ex*0.05;
     dopa = clamp(dopa - pdDecline + dopaRescue, 15, 100);
   }
   return out;
@@ -803,7 +864,7 @@ function refreshPath(){
       ['Tremor / rigidity',path._tremor*100,false],['Surviving SN neurons',100-loss,true]]);
     $('#pathInfo').innerHTML=`<div class="kv"><b>Circuit</b><span>Substantia nigra pars compacta → striatum (nigrostriatal pathway), ~80% of the brain's dopamine.</span></div>
       <div class="kv"><b>Lesion</b><span>Dopaminergic neuron loss; motor signs appear once ~30–50% of nigral neurons are gone (Popescu 2024).</span></div>
-      <div class="kv"><b>Intervention</b><span>Aerobic exercise raises dopamine D2-receptor binding &amp; BDNF and delays progression (Petzinger 2013, Lancet Neurol); meditation raises dopamine (2nd paper).</span></div>
+      <div class="kv"><b>Intervention</b><span>Aerobic exercise raises striatal dopamine release (Sacheli 2019 PET RCT, n=35) &amp; serum BDNF (Kaagman 2024, SMD 1.2) and lowers UPDRS-III motor scores by ~4–6 pts (van der Kolk 2019; Cochrane 2024). Meditation improves motor scores in some trials (Kwok 2025, −4 pts at 6 mo) but has no evidence of restoring nigral dopamine; its slider here stands in for the mind-body effect, not a dopamine mechanism.</span></div>
       <div class="kv"><b>Axon shade</b><span>As dopamine output falls, the nigrostriatal axons darken, a darker axon is sending less dopamine to the striatum, and the yellow dopamine particles visibly travel slower along it.</span></div>`;
   } else {
     const burden=+$('#burden').value, clear=+$('#clear').value;
@@ -815,7 +876,7 @@ function refreshPath(){
       ['Microtubule integrity',path._mtInteg,true]]);
     $('#pathInfo').innerHTML=`<div class="kv"><b>Plaques</b><span>Extracellular amyloid-β42 fibrils aggregate into senile plaques → oxidative stress, impaired LTP.</span></div>
       <div class="kv"><b>Tangles</b><span>Hyperphosphorylated tau detaches from microtubules → neurofibrillary tangles → transport failure.</span></div>
-      <div class="kv"><b>Clearance</b><span>Omega-3 &amp; exercise lower amyloid/oxidative load; anti-amyloid drugs target fibrils.</span></div>`;
+      <div class="kv"><b>Clearance</b><span>Anti-amyloid antibodies remove fibrils. Omega-3 and exercise do not: CSF Aβ42 was unchanged by omega-3 (Tofiq 2021) and activity showed no longitudinal amyloid effect (Slee 2024); exercise instead blunts amyloid's impact on cognition (Rabin 2019).</span></div>`;
   }
 }
 function animatePath(){
@@ -857,7 +918,8 @@ const GAUGES=[
 ];
 function buildGauges(tr){
   const m=state.month;
-  $('#gauges').innerHTML = GAUGES.map(g=>{
+  const gauges = state.pd ? GAUGES.concat([{k:'updrs', lab:'UPDRS-III motor (PD)', max:60, good:false}]) : GAUGES;
+  $('#gauges').innerHTML = gauges.map(g=>{
     const v=tr[g.k][m], v0=tr[g.k][0], d=v-v0, pct=v/g.max*100;
     const col=g.good?(pct>55?'#5fae7a':pct>35?'#d1a53c':'#e2705f'):(pct<40?'#5fae7a':pct<65?'#d1a53c':'#e2705f');
     const gd=g.good?d>=0:d<=0; const arrow=d>0?'▲':d<0?'▼':'–';
@@ -879,8 +941,9 @@ const SCORE=[
 ];
 function buildScoreboard(tr, base){
   const m=state.month;
+  const score = state.pd ? SCORE.concat([['updrs','Parkinson’s motor score (UPDRS-III, lower is better)', false]]) : SCORE;
   $('#scoreTbl').innerHTML='<tr><th>Factor</th><th>Your plan</th><th>Doing nothing</th><th>Difference</th></tr>'+
-    SCORE.map(([k,lab,goodUp])=>{
+    score.map(([k,lab,goodUp])=>{
       const a=tr[k][m], b=base[k][m], pct=b?(a-b)/b*100:0;
       const better=goodUp?pct>=0:pct<=0;
       const col=Math.abs(pct)<0.05?'var(--dim)':better?'var(--good)':'var(--bad)';
@@ -958,15 +1021,24 @@ async function loadLiterature(){
 
 const BENCH=[
   { label:'Untreated AD · Barnes & Fox 2009 + Han 2000 meta-analyses',
-    match:{o3:0,ex:0,cst:0,med:0}, hippo:-9.3, mmse:-6.6,
+    match:{o3:0,ex:0,cst:0,med:0}, hippo:-9.3, mmse:-6.6, updrs:4.8,
     note:'Hippocampal atrophy ≈ −4.66%/yr (meta-analysis of serial-MRI AD studies); MMSE −3.3 pts/yr [−3.7, −2.9] (Han 2000, 37 studies, n=3,492; mild AD toward the slower end). Both extrapolated to 24 mo.' },
-  { label:'Exercise only · Erickson et al. 2011 RCT (n=120)',
-    match:{o3:0,ex:70,cst:0,med:0}, hippo:4.0, mmse:-3.4,
-    note:'+2%/yr hippocampal volume from aerobic walking, in HEALTHY older adults (population mismatch), extrapolated to 24 mo. MMSE endpoint approximated as decline slowed ~30% vs. untreated, no AD RCT reports this directly.' },
+  { label:'Exercise only · EXERT 2025 RCT (aMCI, n=296) + DAPA 2018 (dementia, n=494)',
+    match:{o3:0,ex:70,cst:0,med:0}, hippo:-1.0, mmse:0, updrs:0.6,
+    note:'EXERT (Baker 2025): 12 months of aerobic exercise in amnestic MCI, hippocampal loss −0.51%/yr in both arms (5× slower than untreated ADNI MCI, −2.6%/yr; Schuff 2009), extrapolated to 24 mo; cognition (ADAS-Cog-Exec) flat, so the MMSE endpoint is 0 Δ. Ceiling: in established dementia DAPA (Lamb 2018) found ADAS-cog 1.4 pts WORSE with exercise [0.2, 2.6]. Erickson 2011 (+2%/yr, healthy adults) is no longer the benchmark; population mismatch was too large.' },
+  { label:'Omega-3 only · MAPT 2017 (n=1,525) + PreventE4 2026 (n=365) + OmegAD 2006 (n=204)',
+    match:{o3:70,ex:0,cst:0,med:0}, hippo:-9.3, mmse:-6.6,
+    note:'Every large omega-3 RCT is null: MAPT composite Δ 0.011 SD [−0.081, 0.103] at 36 mo; PreventE4 no brain-volume or cognition difference at 24 mo (target engagement confirmed, independent of APOE4); OmegAD no MMSE/ADAS-cog difference in mild-moderate AD. The omega-3-only endpoint is therefore the UNTREATED endpoint. The model over-predicts here on purpose: its omega-3 → BDNF/CBF/CRP coefficients are real (Ziaei 2024, Li 2014) but the downstream trials show those biomarker gains do not reach structure or cognition within 2–3 years.' },
+  { label:'CST only · Woods et al. 2023 Cochrane (25 RCTs, n=1,893)',
+    match:{o3:0,ex:0,cst:70,med:0}, hippo:null, mmse:-4.6,
+    note:'MMSE +1.99 pts [1.24, 2.74] vs usual care at end of treatment, applied on top of the untreated −6.6 pt decline. No hippocampal endpoint exists for CST, so that row is omitted.' },
+  { label:'Meditation only · Shi et al. 2025 meta (25 RCTs, n=2,095)',
+    match:{o3:0,ex:0,cst:0,med:70}, hippo:null, mmse:-4.4,
+    note:'MMSE +2.22 pts [0.83, 3.62] vs usual care in SCD/MCI/AD, applied on top of the untreated decline; trials are short (weeks–months) so 24-mo persistence is an extrapolation. Innes 2017 found no superiority over an active (music) control. Hippocampal data: only Wells 2013 (n=13, 8 wk, p=0.07), too weak to benchmark.' },
+  { label:'Multi-domain · US POINTER 2025 (n=2,111) + FINGER 2015 (n=1,260)',
+    match:{o3:80,ex:80,cst:75,med:50}, hippo:null, mmse:-6.4,
+    note:'US POINTER (Baker 2025, JAMA): structured multi-domain program beat self-guided by +0.029 SD/yr [0.008, 0.050] → ~+0.06 SD ≈ +0.2 MMSE pts over 24 mo, in HEALTHY at-risk adults who improved in both arms (practice effects). MAPT multidomain arm 0.079 SD [−0.012, 0.170] ns. No trial includes meditation or omega-3 in the bundle, and none reports hippocampal volume, so the combination endpoint is small, population-mismatched, and MMSE-only.' },
 ];
-/* Multi-domain benchmark removed 2026-09-10: no published trial combines all
-   four interventions, so its Δ=0 "endpoints" were placeholders, not data —
-   they produced misleading residuals whenever several sliders were raised. */
 function updateValidation(tr){
   const el=$('#validPanel'); if(!el) return;
   const s={o3:+$('#o3').value, ex:+$('#ex').value, cst:+$('#cst').value, med:+$('#med').value};
@@ -975,11 +1047,14 @@ function updateValidation(tr){
   const rows=[   // [label, simulated Δ, trial Δ, unit, normalizing clinical range]
     ['Hippocampal volume Δ', tr.hippo[MONTHS]-tr.hippo[0], best.hippo, '%',    20],
     ['Cognition (MMSE) Δ',   tr.cog[MONTHS]-tr.cog[0],     best.mmse,  ' pts', 6],
-  ];
+  ].filter(r=>r[2]!=null);   // a benchmark with no published endpoint for that metric omits the row
   let pdNote='';
-  if(state.pd){ // Marek 2001 (Neurology, n=56 serial SPECT): striatal DAT −11.2%/yr in PD → −22.4% over 24 mo
-    rows.push(['Dopamine (SN) Δ', (tr.dopa[MONTHS]-tr.dopa[0])/tr.dopa[0]*100, -22.4, '%', 30]);
-    pdNote=' PD row: dopaminergic decline vs Marek 2001 serial DAT imaging (−11.2%/yr untreated; interventions in your plan slow the simulated rate).';
+  if(state.pd){ // Simuni 2018 (PPMI, n=423 serial DAT-SPECT): striatal binding −17.0% cumulative at 24 mo (−11.2% at 12 mo, matching Marek 2001)
+    rows.push(['Dopamine (SN) Δ', (tr.dopa[MONTHS]-tr.dopa[0])/tr.dopa[0]*100, -17.0, '%', 30]);
+    // UPDRS-III: untreated +2.4 pts/yr (Holden 2018, PPMI) → +4.8 at 24 mo; exercise arm = that slope minus the
+    // Park-in-Shape 6-month offset (−4.2 pts, van der Kolk 2019) held constant, an extrapolation, no 24-mo RCT exists
+    rows.push(['UPDRS-III motor Δ', tr.updrs[MONTHS]-tr.updrs[0], best.updrs, ' pts', 8]);
+    pdNote=' PD rows: dopamine vs Simuni 2018 PPMI serial DAT imaging (−17% over 24 mo untreated; decline decelerates after year 1). UPDRS-III vs Holden 2018 untreated slope (+2.4 pts/yr) and, for the exercise scenario, the Park-in-Shape 2019 6-month offset (−4.2 pts) carried to 24 months, an extrapolation since no 24-month PD exercise RCT has published.';
   }
   const agree=clamp(100*(1-rows.reduce((a,r)=>a+Math.min(1,Math.abs(r[1]-r[2])/r[4]),0)/rows.length),0,100);
   const fmt=v=>(v>0?'+':'')+v.toFixed(1);
@@ -1035,11 +1110,45 @@ function initSci(){
   <h3>Effect directions (verified)</h3>
   <ul>
     <li><b>Aerobic exercise</b>, strongest BDNF & vascular driver; ↑ cerebral blood flow/VEGF, ↑ hippocampal volume, ↑ neurogenesis.</li>
-    <li><b>Omega-3 (DHA/EPA)</b>, ↑ BDNF, ↑ neurogenesis/synaptogenesis, ↓ neuroinflammation & oxidative stress; clearance benefit modeled larger in ε4 carriers.</li>
-    <li><b>CST</b>, direct ↑ cognition/executive function & functional connectivity; weaker molecular effect.</li>
-    <li><b>Meditation</b>, ↓ stress/inflammation, supports dopamine & connectivity.</li>
-    <li><b>APOE4</b>, accelerates atrophy & plaque growth (risk factor 1.0/1.45/1.90× for 0/1/2 copies).</li>
+    <li><b>Omega-3 (DHA/EPA)</b>, ↑ BDNF, ↑ neurogenesis/synaptogenesis, ↓ neuroinflammation & oxidative stress. No amyloid-clearance effect (removed 2026-09-11, see below) and no ε4 advantage.</li>
+    <li><b>CST</b>, direct ↑ cognition/executive function & functional connectivity; small ↑ BDNF (direction confirmed, Nicastri 2022).</li>
+    <li><b>Meditation</b>, ↓ stress, small ↑ cerebral blood flow, direct ↑ MMSE; eases Parkinson's motor scores in some trials but has no evidence of restoring dopamine.</li>
+    <li><b>APOE4</b>, accelerates hippocampal atrophy & plaque accrual (rate multiplier 1.0/1.35/1.70× for 0/1/2 copies ≈ +1.1 %/yr extra atrophy per copy, Schuff 2009 / Cai 2026). Distinct from the 2–3× / ~10× lifetime AD-risk multiplier.</li>
   </ul>
+  <h3>Calibration pass 3 (2026-09-11): what the new trials changed</h3>
+  <p>Two parallel literature searches (Alzheimer's/APOE and Parkinson's/dopamine) added 49 verified rows with effect sizes, confidence intervals and sample sizes. Five model assumptions did not survive contact with the data:</p>
+  <ul>
+    <li><b>Lifestyle amyloid clearance removed.</b> The model used to let omega-3 and exercise clear plaque, with an extra boost in ε4 carriers. Tofiq 2021 (OmegAD CSF sub-study) found CSF Aβ42 unchanged by omega-3 while neurofilament light and YKL-40 rose; PreventE4 (Yassine 2026, n=365) found no brain-volume or cognition difference at 24 months; Slee 2024 (AIBL, n=731, 15 years) found no longitudinal link between physical activity and amyloid (β −0.26, p=0.24) and no APOE moderation. Plaque now accrues at a literature rate (Villemagne 2013: 0.043 SUVR/yr ≈ 4 centiloids/yr; Bollack 2024) and nothing on the sliders removes it.</li>
+    <li><b>The ε4 × omega-3 boost was backwards.</b> Arellanes 2020 found CSF EPA rose three times <i>more</i> in non-carriers than in ε4 carriers; PreventE4 target engagement was independent of ε4 (interaction p=0.71). Removed.</li>
+    <li><b>Exercise builds resilience, not clearance.</b> Rabin 2019 (Harvard Aging Brain Study, n=182): physical activity blunts amyloid's effect on cognitive decline (interaction β 0.03 [0.02, 0.05]) without changing amyloid level. The model now attenuates the plaque→cognition penalty by up to 35 % at full exercise dose instead of lowering plaque.</li>
+    <li><b>APOE4 atrophy penalty was ~3× too strong.</b> Schuff 2009 (ADNI): ε4 adds −1.4 %/yr hippocampal loss in AD; Cai 2026 meta (n=4,311): ~−1 %/yr per copy. Refit to ~1.1 %/yr per copy.</li>
+    <li><b>Meditation does not rescue dopamine.</b> The old Parkinson's term let meditation slow nigral loss at 89 % of exercise's strength. No PD dopamine-imaging data exist for meditation; Kjaer 2002's +65 % striatal dopamine release was acute, in healthy meditators, in the ventral striatum. Meditation now acts only on a symptomatic UPDRS-III offset capped at 0.6× exercise (Cochrane 2024 network meta: mind-body −3.62 [−7.24, 0.00] vs endurance −5.76 [−9.78, −1.74]; Kwok 2025 RCT −4.0 pts at 6 months; Advocat 2016 null).</li>
+  </ul>
+  <p>Three magnitudes were recalibrated to better-matched populations: exercise → CRP now uses the older-adult network meta-analysis (Hong 2026, 54 RCTs, SMD −0.73 [−1.17, −0.29]) instead of an all-age pool; exercise → BDNF in Parkinson's mode uses the PD-specific RCT-only meta (Kaagman 2024, SMD 1.20 [0.53, 1.87]); and the dopamine decline is now two-slope, matching PPMI serial DAT imaging (Simuni 2018, n=423: −11.2 % at 12 months, −17.0 % cumulative at 24, −27.4 % at 48) rather than a straight line. A new UPDRS-III motor series (baseline 20.9, +2.4 pts/yr untreated, Holden 2018) appears in Parkinson's mode with its own validation row.</p>
+  <p>Finally, the structural constants (atrophy, inflammation penalty, brain→cognition mapping) were refit by least squares so the untreated run reproduces the published 24-month endpoints (hippocampus −9.3 %, MMSE −6.6). Before this pass the untreated ε4-carrier run lost 28 % of hippocampal volume and 14 MMSE points, about three times the literature. Where the literature says an intervention does <i>not</i> work (omega-3 on structure and cognition: MAPT 2017, PreventE4 2026, OmegAD 2006; exercise on cognition in established dementia: DAPA 2018), the validation panel now carries that null endpoint and the residual shows the model's over-prediction rather than hiding it.</p>
+  <h3>New sources added in this pass (all numbers verified against the fetched abstract)</h3>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/29572948/" target="_blank" rel="noopener">Simuni et al., <i>Movement Disorders</i> (2018), PPMI 5-year longitudinal DAT imaging and MDS-UPDRS</a><p>n=423 early untreated PD. Striatal DAT binding −11.2 % (SD 15.1) at year 1, −17.0 % at year 2, −27.4 % at year 4; baseline MDS-UPDRS-III 20.9. Sets the dopamine trajectory shape and the UPDRS-III starting point.</p><span class="src">PubMed 29572948 · PMC6001458</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/29662921/" target="_blank" rel="noopener">Holden et al., <i>Mov Disord Clin Pract</i> (2018), progression of MDS-UPDRS scores over five years in de novo PD</a><p>n=362 PPMI. Part III +2.4 pts/yr; total +4.0 pts/yr. Sets the untreated UPDRS-III slope.</p><span class="src">PubMed 29662921</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/31521532/" target="_blank" rel="noopener">van der Kolk et al., <i>Lancet Neurology</i> (2019), Park-in-Shape: home-based aerobic exercise RCT in PD</a><p>n=130, double-blind, 6 months of home cycling vs stretching. MDS-UPDRS-III (off) difference −4.2 pts [1.6, 6.9], p=0.002. Sets the exercise motor offset.</p><span class="src">PubMed 31521532</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/38588457/" target="_blank" rel="noopener">Ernst et al., <i>Cochrane Database</i> (2024), physical exercise for people with Parkinson's disease, network meta-analysis</a><p>154 RCTs, 7,837 participants. UPDRS motor vs passive control: endurance −5.76 [−9.78, −1.74]; mind-body −3.62 [−7.24, 0.00]; dance −10.18 [−14.87, −5.36]. Caps meditation's motor effect at 0.6× exercise.</p><span class="src">PubMed 38588457 · PMC11001292</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/31584222/" target="_blank" rel="noopener">Sacheli et al., <i>Movement Disorders</i> (2019), exercise increases caudate dopamine release in PD (raclopride PET RCT)</a><p>n=35, 36 aerobic sessions. Increased evoked caudate dopamine release (p=0.04). The only human PD dopamine-imaging RCT behind the exercise→dopamine term; magnitude unpublished, so that term stays an assumption.</p><span class="src">PubMed 31584222</span></div>
+  <div class="cite"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11965853/" target="_blank" rel="noopener">Kwok et al., <i>Psychotherapy and Psychosomatics</i> (2025), mindfulness meditation and yoga RCT in PD</a><p>n=159, 8 weeks vs usual care. MDS-UPDRS-III: meditation −5.35 [−8.61, −2.09] at 2 months, −4.01 [−7.43, −0.59] at 6; yoga's benefit did not persist. Participants unblinded, so expectancy inflation is likely; Advocat 2016 (n=72) was null on its primary outcome.</p><span class="src">PubMed 40024243</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/11958969/" target="_blank" rel="noopener">Kjaer et al., <i>Cognitive Brain Research</i> (2002), increased dopamine tone during meditation</a><p>Healthy Yoga Nidra meditators: −7.9 % raclopride binding = +65 % endogenous ventral-striatal dopamine release <i>during</i> the session. Acute, healthy, limbic striatum: not evidence of nigral sparing in PD.</p><span class="src">PubMed 11958969</span></div>
+  <div class="cite"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2918373/" target="_blank" rel="noopener">Cheng, Ulane &amp; Burke, <i>Annals of Neurology</i> (2010) and Kordower et al., <i>Brain</i> (2013), nigral neuron and putamen terminal loss</a><p>Motor signs appear at ~30 % nigral neuron loss but 50–70 % putamen terminal loss; putamen dopaminergic markers are virtually gone by 4 years post-diagnosis (n=28 PD brains). Used in the Pathology Lab thresholds.</p><span class="src">PubMed 20517933 · Brain 136:2419</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/19251758/" target="_blank" rel="noopener">Schuff et al., <i>Brain</i> (2009), ADNI serial MRI hippocampal atrophy rates</a><p>Controls −0.8 %/yr, MCI −2.6 %/yr, AD −4.4 %/yr (corroborating Barnes &amp; Fox 2009). APOE ε4 adds −1.4 %/yr (SE 0.5) in AD but not in MCI or controls. Sets the ε4 atrophy multiplier.</p><span class="src">PubMed 19251758 · PMC2668943</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/23477989/" target="_blank" rel="noopener">Villemagne et al., <i>Lancet Neurology</i> (2013), amyloid accumulation over 3.8 years (PiB PET)</a><p>n=200. Accumulators gain 0.043 SUVR/yr [0.037, 0.049]; baseline SUVR AD 2.27, MCI 1.94, controls 1.38. With Bollack 2024 (AMYPAD, 1.5–4.4 centiloids/yr) sets the plaque accrual rate.</p><span class="src">PubMed 23477989 · PubMed 38574374</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/40271888/" target="_blank" rel="noopener">Baker et al., <i>Alzheimer's &amp; Dementia</i> (2025), EXERT: aerobic exercise vs stretching in amnestic MCI</a><p>n=296, 12 months. Hippocampal loss −0.51 %/yr in both arms (5× slower than untreated ADNI MCI); cognition flat in both arms (p=0.3). Shadyab 2025: both arms beat propensity-matched untreated ADNI participants. Replaces Erickson 2011 (healthy adults) as the exercise benchmark.</p><span class="src">PubMed 40271888 · PubMed 40271887</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/29769247/" target="_blank" rel="noopener">Lamb et al., <i>BMJ</i> (2018), DAPA: moderate-to-high intensity exercise in mild-to-moderate dementia</a><p>n=494, the largest exercise-in-dementia RCT. ADAS-cog 1.4 pts <i>worse</i> with exercise [0.2, 2.6], p=0.03, despite better fitness. A ceiling on exercise cognitive benefit in established dementia; Hoffmann 2016 (ADEX, n=200) was null on intention-to-treat.</p><span class="src">PubMed 29769247</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/28359749/" target="_blank" rel="noopener">Andrieu et al., <i>Lancet Neurology</i> (2017), MAPT: omega-3 and multidomain intervention, 3-year RCT</a><p>n=1,525 older adults with memory complaints. Omega-3 composite cognition Δ 0.011 SD [−0.081, 0.103], p=0.81; multidomain 0.079 [−0.012, 0.170]. Sets the omega-3-only benchmark to the untreated endpoint.</p><span class="src">PubMed 28359749</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/42315445/" target="_blank" rel="noopener">Yassine et al., <i>EBioMedicine</i> (2026), PreventE4: DHA supplementation in APOE4 carriers and non-carriers</a><p>n=365, 47 % ε4 carriers. CSF DHA/AA ratio +0.19 [0.16, 0.21] confirms target engagement, independent of ε4 (p=0.71); no brain-volume or cognition difference at 24 months. Arellanes 2020 (n=33): CSF EPA rose 3× more in non-carriers. Removes the model's ε4-boosted omega-3 effect.</p><span class="src">PubMed 42315445 · PubMed 32690472</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/34420949/" target="_blank" rel="noopener">Tofiq et al., <i>J Alzheimer's Disease</i> (2021), OmegAD CSF biomarker sub-study</a><p>n=33 AD, 6 months omega-3. CSF Aβ42 unchanged; NfL (p=0.03) and YKL-40 (p=0.04) increased in the omega-3 arm. Freund-Levi 2006 (n=204): no MMSE/ADAS-cog difference. Removes the omega-3 amyloid-clearance term.</p><span class="src">PubMed 34420949 · PubMed 17030655</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/37984813/" target="_blank" rel="noopener">Slee et al., <i>Alzheimer's &amp; Dementia</i> (2024), physical activity and brain amyloid over 15 years (AIBL)</a><p>n=731 cognitively unimpaired. No longitudinal association between activity and amyloid (β −0.26, p=0.24); APOE ε4 did not moderate. Removes the exercise amyloid-clearance term. Okonkwo 2014 (WRAP) is cross-sectional only.</p><span class="src">PubMed 37984813 · PubMed 25298312</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/31312836/" target="_blank" rel="noopener">Rabin et al., <i>JAMA Neurology</i> (2019), physical activity, amyloid and cognitive decline (Harvard Aging Brain Study)</a><p>n=182. Activity × amyloid interaction on cognitive decline β 0.03 [0.02, 0.05], p&lt;0.001, and on grey-matter loss. Exercise moderates amyloid's <i>consequences</i>; grounds the model's resilience term.</p><span class="src">PubMed 31312836</span></div>
+  <div class="cite"><a href="https://jamanetwork.com/journals/jama/fullarticle/2837122" target="_blank" rel="noopener">Baker et al., <i>JAMA</i> (2025), US POINTER: structured vs self-guided lifestyle intervention</a><p>n=2,111 sedentary at-risk adults, 24 months. Structured program +0.029 SD/yr [0.008, 0.050] over self-guided; both arms improved; equal benefit in ε4 carriers (p=0.95). With J-MINT (Oki 2024, +0.16 z [0.04, 0.27]) sets the multi-domain benchmark.</p><span class="src">NCT03688126 · PubMed 39229900</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/42625625/" target="_blank" rel="noopener">Hong, Wang et al., <i>Frontiers in Medicine</i> (2026), exercise and C-reactive protein in adults ≥60, Bayesian network meta-analysis</a><p>54 RCTs, n=2,836. Aerobic exercise → CRP SMD −0.73 [−1.17, −0.29]; resistance −0.46; mind-body not significant. Recalibrates exercise → inflammation from −4 to −15 (older-adult population match).</p><span class="src">PubMed 42625625</span></div>
+  <div class="cite"><a href="https://pubmed.ncbi.nlm.nih.gov/36089933/" target="_blank" rel="noopener">Nicastri et al., <i>Alzheimer's &amp; Dementia: TRCI</i> (2022), cognitive training, mindfulness and exercise effects on BDNF</a><p>n=144 healthy older adults, 4 arms. Only the cognitive-training arm raised serum BDNF (p=0.01). Akalp 2024 (MCI meta): exercise → BDNF not significant in MCI (SMD 0.95 [−0.24, 2.14]). Newberg 2010: meditation raised prefrontal CBF (n=14, no % published). Wells 2013: MBSR hippocampal −32 vs −274 mm³ (n=13, p=0.07).</p><span class="src">PubMed 36089933 · 38981326 · 20164557 · 24120430</span></div>
+  <div class="cite"><a href="https://www.frontiersin.org/journals/aging-neuroscience/articles/10.3389/fnagi.2025.1620172/full" target="_blank" rel="noopener">Zhao et al., <i>Frontiers in Aging Neuroscience</i> (2025), peripheral BDNF in Parkinson's disease, meta-analysis</a><p>38 studies, 2,589 PD vs 2,422 controls. BDNF SMD −1.04 [−1.41, −0.66]. Quantifies the PD BDNF deficit that Kaagman 2024's large exercise response acts on. Süleymanoğulları 2025 (19 RCTs): no dose-response of BDNF with exercise duration or frequency, so the model keeps linear dose scaling.</p><span class="src">DOI 10.3389/fnagi.2025.1620172 · PubMed 41594760</span></div>
+  <div class="cite"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3285459/" target="_blank" rel="noopener">Li et al., <i>NEJM</i> (2012), tai chi and postural stability in PD; Li et al., <i>JNNP</i> (2024), long-term tai chi</a><p>NEJM RCT n=195: UPDRS-III −5.02 [−6.90, −3.13] vs stretching, falls IRR 0.33. JNNP 2024 cohort n=330: slower annual UPDRS deterioration over 3.5 years (non-randomised). Tsukita 2022 (PPMI, n=237): sustained activity slowed postural/gait decline (β −0.10 [−0.14, −0.06]).</p><span class="src">PubMed 22316445 · 37875337 · 35022304</span></div>
   <h3>Why there is no synergy term</h3>
   <p>Earlier versions added a cross-product "synergy bonus" when several interventions were combined. It was removed: no published trial combines all four of these interventions, so there is no data to calibrate an interaction effect against (FINGER 2015 has no factorial arms isolating each domain). Combining sliders still helps in the model, but only as the sum of each intervention's own literature-derived effect.</p>
   <div class="note">Coefficients recalibrated 2026-07-12 against real meta-analyses and RCTs (see <code>W</code> object in <code>app.js</code> for full per-coefficient citations, effect sizes, and confidence/population-match flags). Several placeholders were substantially larger than the literature supports and have been reduced, most real intervention→biomarker effects are small-to-moderate, not the dramatic swings the original placeholders implied.</div>
