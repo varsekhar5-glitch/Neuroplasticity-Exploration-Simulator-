@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { APOE_CA, APOE_HELICES, APOE_PDB } from './apoe_structure.js';
+import { BRAIN_MESHES } from './brain_structure.js';
 
 /* ============================================================
    Neuroplasticity Exploration Simulator ,  app.js
@@ -249,9 +250,9 @@ function makeScene(vp){
   return { scene, cam, r, ctrl, onR };
 }
 // text sprite label — canvas auto-sizes to text; call sp.setText() to relabel
-function label(text, color='#dfe8f2', scale=0.34, info=null){
+function label(text, color='#dfe8f2', scale=0.34, info=null, plain=false){
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent:true, depthTest:false }));
-  sp.renderOrder=999; sp._scale=scale; sp._color=color;
+  sp.renderOrder=999; sp._scale=scale; sp._color=color; sp._plain=plain;
   if(info) sp.userData.info=info; else sp.raycast=()=>{}; // a labeled structure is clickable via its own box; purely decorative labels stay click-through to whatever's behind them
   sp.setText = t => {
     const fs=32, pad=18;
@@ -259,10 +260,12 @@ function label(text, color='#dfe8f2', scale=0.34, info=null){
     const w=Math.ceil(m.measureText(t).width)+pad*2, h=fs+18;
     const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
     const x=cv.getContext('2d'); x.font=`bold ${fs}px sans-serif`; x.textAlign='center'; x.textBaseline='middle';
-    x.fillStyle='rgba(10,7,4,.72)'; x.fillRect(0,0,w,h); x.fillStyle=sp._color; x.fillText(t,w/2,h/2);
+    if(sp._plain){ x.lineJoin='round'; x.lineWidth=7; x.strokeStyle='rgba(8,6,4,.9)'; x.strokeText(t,w/2,h/2); }   // outlined text, no box: never hides what it labels
+    else { x.fillStyle='rgba(10,7,4,.72)'; x.fillRect(0,0,w,h); }
+    x.fillStyle=sp._color; x.fillText(t,w/2,h/2);
     const tex=new THREE.CanvasTexture(cv); tex.anisotropy=4;
     sp.material.map&&sp.material.map.dispose(); sp.material.map=tex; sp.material.needsUpdate=true;
-    sp.scale.set(sp._scale*w/h, sp._scale, 1);
+    sp._aspect=w/h; sp.scale.set(sp._scale*w/h, sp._scale, 1);
   };
   sp.setText(text); return sp;
 }
@@ -270,29 +273,29 @@ function label(text, color='#dfe8f2', scale=0.34, info=null){
 /* ============================================================
    3b. 3D BRAIN, dissectable, layered anatomy
    ============================================================ */
-/* ---- anatomical tissue colors ---- */
-const COL={cortex:0xd7a595,white:0xece0cf,hippo:0xc77b5e,thal:0xb98a6d,striat:0xa8705a,
-  pallid:0xcaa184,nigra:0x2c1a10,amyg:0xb06a54,cbl:0xcf9a86,cblCore:0xe8dcc6,stem:0xc99277,
-  vent:0x8fb3ad,callosum:0xf0e6d3,plaque:0xbf3b2b,spark:0x9ccf6a,blood:0xcc3333};
+/* ---- anatomical tissue colors, sampled from fresh-tissue photos & atlas plates ---- */
+const COL={cortex:0xc8a094,white:0xe8dccb,hippo:0xc7957e,thal:0xb9917d,striat:0xc69684,
+  pallid:0xd4b39e,nigra:0x3f2c29,amyg:0xbe8a78,cbl:0xb8978a,stem:0xd6c5b0,vdc:0xcdb8a6,
+  vent:0x9fb8bd,callosum:0xeee3d3,plaque:0xbf3b2b,spark:0x9ccf6a,blood:0xb8322e};
 const CMAX=2.0;
-const brain={clip:new THREE.Plane(new THREE.Vector3(-1,0,0),CMAX)};
-function gyri(rad,amp,freq){
-  const geo=new THREE.SphereGeometry(rad,120,90),p=geo.attributes.position;
-  for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i);
-    let n=Math.sin(freq*x)*Math.sin(freq*y)*Math.sin(freq*z)+0.5*Math.sin(freq*1.9*x+1)*Math.sin(freq*1.7*z)+0.25*Math.sin(freq*3.1*y)*Math.sin(freq*2.7*x);
-    let k=1+amp*n; k-=0.07*Math.exp(-(x*x)/(0.02*rad*rad));
-    p.setXYZ(i,x*k,y*k,z*k);}
-  geo.computeVertexNormals();return geo;
-}
+const brain={clip:new THREE.Plane(new THREE.Vector3(1,0,0),CMAX)};
 function tmat(color,extra){return new THREE.MeshStandardMaterial(Object.assign({color,roughness:.72,metalness:.02,clippingPlanes:[brain.clip]},extra));}
-function mkPart(color,r1,r2,h,pos){const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,18),tmat(color));m.position.set(...pos);return m;}
-function nucleus(color,rad,pos,scl,name,role,showLabel=true){
-  const g=new THREE.Group(); g.userData.info={name,role};
-  [1,-1].forEach(s=>{const m=new THREE.Mesh(new THREE.SphereGeometry(rad,28,22),tmat(color,{roughness:.55}));
-    m.position.set(pos[0]*s,pos[1],pos[2]);if(scl)m.scale.set(...scl);m.userData.info={name,role};g.add(m);});
-  brain.root.add(g);brain.inner.push(g);
-  if(showLabel&&name){const l=label(name,'#dfe8f2',.28,{name,role});l.position.set(Math.abs(pos[0])+rad+0.15,pos[1]+0.05,pos[2]);brain.root.add(l);brain.innerLabels.push(l);}
-  return g;
+// real anatomical mesh from brain_structure.js (fsaverage pial cortex + MNI152 aseg structures).
+// Geometry is re-centred on its own centroid so mesh.scale shrinks/grows the structure in place.
+function realMesh(key,mat,name,role){
+  const {v,f}=BRAIN_MESHES[key], g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(v,3)); g.setIndex(f);
+  g.computeBoundingSphere(); const c=g.boundingSphere.center.clone(); g.translate(-c.x,-c.y,-c.z);
+  g.computeVertexNormals(); g.computeBoundingSphere();
+  const m=new THREE.Mesh(g,mat); m.position.copy(c); m.userData.r=g.boundingSphere.radius;
+  if(name) m.userData.info={name,role}; brain.root.add(m); return m;
+}
+// callout label: small text sprite kept OUTSIDE the brain silhouette, thin leader line + dot on the
+// structure. Laid out every frame in layoutLabels(); `targets` are candidate meshes (L/R pairs), the
+// one nearest the camera that survives the cross-section is used; `fixed` = anchor offset from centroid.
+function callout(text,color,targets,info,inner,fixed,top=false){
+  const sp=label(text,color,1,info,true); sp.visible=false; brain.root.add(sp);
+  brain.labels.push({sp,targets:[].concat(targets),inner,fixed,top,anchor:new THREE.Vector3(),on:false});
 }
 function tagInfo(obj,name,role){ obj.traverse?obj.traverse(o=>{if(o.isMesh)o.userData.info={name,role};}):(obj.userData.info={name,role}); return obj; }
 function setupInspect(o, panelSel){
@@ -319,7 +322,7 @@ function setupInspect(o, panelSel){
   });
 }
 function exportPNG(o,name){ o.r.render(o.scene,o.cam); const a=document.createElement('a'); a.download=(name||'neuroai')+'.png'; a.href=o.r.domElement.toDataURL('image/png'); a.click(); }
-const SECT={sagittal:[-1,0,0],coronal:[0,0,-1],axial:[0,-1,0]};
+const SECT={sagittal:[1,0,0],coronal:[0,0,-1],axial:[0,-1,0]};
 const SECT_TAG={sagittal:'Sagittal section · left/right',coronal:'Coronal section · front/back',axial:'Axial section · top/bottom'};
 const setRange=(el,v)=>{ el.value=v; el.style.setProperty('--p',((v-el.min)/(el.max-el.min)*100)+'%'); };
 function updateViewTag(){ const t=$('#brainViewTag'); if(!t) return;
@@ -330,65 +333,124 @@ function setSection(axis){ const n=SECT[axis]||SECT.sagittal; brain.axis=axis; b
   $('#sectSeg')&&$('#sectSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.sect===axis)); }
 function initBrain(){
   const vp=$('#brainVP');Object.assign(brain,makeScene(vp),brain);
-  brain.cam.position.set(3.2,1.1,4.4);
+  brain.cam.position.set(-5.2,1.3,4.6); brain.ctrl.target.set(0,-.2,0);   // left lateral, slightly anterior; room for callouts
   const root=new THREE.Group();brain.scene.add(root);brain.root=root;
-  brain.shells=[];brain.inner=[];brain.innerLabels=[];
-  const XS=[1.22,1.0,1.32];
-  const wm=new THREE.Mesh(gyri(1.34,0.03,7.6),tmat(COL.white,{transparent:true,side:THREE.DoubleSide}));wm.scale.set(...XS);root.add(wm);brain.shells.push(wm);
-  tagInfo(wm,'White matter','Myelinated axon tracts wiring regions together.');
-  const cx=new THREE.Mesh(gyri(1.5,0.088,7.4),tmat(COL.cortex,{transparent:true,side:THREE.DoubleSide,flatShading:false}));cx.scale.set(...XS);root.add(cx);brain.shells.push(cx);
-  tagInfo(cx,'Cerebral cortex','Outer grey matter, thinking, memory, reasoning.');
-  const ccPts=[[0,.5,.85],[0,.78,.35],[0,.82,-.2],[0,.6,-.7],[0,.2,-.75],[0,-.05,-.5]].map(a=>new THREE.Vector3(...a));
-  const cc=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ccPts),50,0.1,14),tmat(COL.callosum,{roughness:.5}));root.add(cc);brain.inner.push(cc);
-  tagInfo(cc,'Corpus callosum','Fiber bridge connecting the two hemispheres.');
-  {const l=label('Corpus callosum','#dfe8f2',.28,{name:'Corpus callosum',role:'Fiber bridge connecting the two hemispheres.'});l.position.set(0.15,1.0,-0.1);root.add(l);brain.innerLabels.push(l);}
-  nucleus(COL.thal,.3,[.34,.08,-.12],[.85,1,1.15],'Thalamus','Sensory & motor relay hub to the cortex.');
-  nucleus(COL.striat,.28,[.72,.06,.12],[.6,1.15,1],'Basal ganglia (striatum)','Movement & reward; dopamine target of the substantia nigra.');
-  nucleus(COL.pallid,.16,[.5,-.02,.06],null,'Globus pallidus','Basal ganglia output, regulates movement.',false);
-  nucleus(COL.amyg,.2,[.72,-.3,.5],null,'Amygdala','Emotion & fear processing.');
-  brain.sn=nucleus(COL.nigra,.13,[.3,-.72,-.28],[1.6,.5,1.1],'Substantia nigra','Dopamine source; degenerates in Parkinson’s disease.');
-  const hipGrp=new THREE.Group();root.add(hipGrp);brain.hip=hipGrp;
+  brain.shells=[];brain.labels=[];brain.showInner=false;
+  const shell=(k,col,name,role,extra)=>{const m=realMesh(k,tmat(col,Object.assign({transparent:true,side:THREE.DoubleSide},extra)),name,role);brain.shells.push(m);return m;};
+  const part=(k,col,name,role,extra)=>{const m=realMesh(k,tmat(col,Object.assign({roughness:.55},extra)),name,role);return m;};
+  const cxL=shell('cortexL',COL.cortex,'Cerebral cortex','Outer grey matter, thinking, memory, reasoning.',{roughness:.6});
+  const cxR=shell('cortexR',COL.cortex,'Cerebral cortex','Outer grey matter, thinking, memory, reasoning.',{roughness:.6});
+  const wm=['whiteL','whiteR'].filter(k=>BRAIN_MESHES[k]).map(k=>shell(k,COL.white,'White matter','Myelinated axon tracts wiring regions together.'));
+  const cc=part('corpusCallosum',COL.callosum,'Corpus callosum','Fiber bridge connecting the two hemispheres.',{roughness:.5});
+  const pair=(k,col,name,role,extra)=>['L','R'].map(s=>part(k+s,col,name,role,extra));
+  const thal=pair('thalamus',COL.thal,'Thalamus','Sensory & motor relay hub to the cortex.');
+  const caud=pair('caudate',COL.striat,'Caudate nucleus (striatum)','Movement & reward; dopamine target of the substantia nigra.');
+  const put =pair('putamen',COL.striat,'Putamen (striatum)','Movement & reward; dopamine target of the substantia nigra.');
+  pair('pallidum',COL.pallid,'Globus pallidus','Basal ganglia output, regulates movement.');
+  pair('accumbens',COL.striat,'Nucleus accumbens','Reward hub of the ventral striatum; dopamine target.');
+  const amyg=pair('amygdala',COL.amyg,'Amygdala','Emotion & fear processing.');
+  const vdc=pair('ventralDC',COL.vdc,'Midbrain / ventral diencephalon','Hypothalamus, subthalamic nucleus & cerebral peduncles; houses the substantia nigra.');
+  const vent=pair('ventricle',COL.vent,'Lateral ventricle','CSF space; enlarges as brain tissue is lost.',{roughness:.3,emissive:0x12302c,emissiveIntensity:.3,transparent:true,opacity:.85});
+  part('ventricle3',COL.vent,'Third ventricle','CSF space between the two thalami.',{roughness:.3,transparent:true,opacity:.85});
+  part('ventricle4',COL.vent,'Fourth ventricle','CSF space between brainstem and cerebellum.',{roughness:.3,transparent:true,opacity:.85});
+  const bs=shell('brainstem',COL.stem,'Brainstem','Vital functions; relays signals between brain and body.',{roughness:.6});
+  const cbl=shell('cerebellum',COL.cbl,'Cerebellum','Balance, coordination & motor timing.',{roughness:.65});
+  // substantia nigra: dark neuromelanin sheet in the midbrain, under each thalamus (not a separate aseg label,
+  // so placed at the ventral-diencephalon centroid). Shrinks & fades with dopamine in Parkinson's mode.
+  brain.sn=new THREE.Group(); root.add(brain.sn);
+  const snInfo={name:'Substantia nigra',role:'Dopamine source; degenerates in Parkinson’s disease.'};
+  vdc.forEach(v=>{const m=new THREE.Mesh(new THREE.SphereGeometry(1,24,18),tmat(COL.nigra,{roughness:.5}));
+    m.position.copy(v.position).add(new THREE.Vector3(0,-.04,-.06)); m.scale.set(.09,.045,.2); m.userData.base=m.scale.clone(); m.userData.r=.2; m.userData.info=snInfo; brain.sn.add(m);});
+  // hippocampus: shared material so colour/emissive track the sim; each side scales about its own centroid
   brain.hipMat=tmat(COL.hippo,{roughness:.5,emissive:0x2a1206,emissiveIntensity:.25});
-  [1,-1].forEach(s=>{const pts=[[.2*s,-.1,.7],[.6*s,-.28,.45],[.8*s,-.4,0],[.62*s,-.32,-.45],[.36*s,-.12,-.7]].map(a=>new THREE.Vector3(...a));
-    hipGrp.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),44,0.12,14),brain.hipMat));});
-  brain.inner.push(hipGrp); tagInfo(hipGrp,'Hippocampus','Learning & memory; atrophies early in Alzheimer’s.');
-  {const l=label('Hippocampus','#f0c6ac',.4,{name:'Hippocampus',role:'Learning & memory; atrophies early in Alzheimer’s.'});l.position.set(1.35,-.4,0);root.add(l);brain.hipLabel=l;}
-  [1,-1].forEach(s=>{const v=new THREE.Mesh(new THREE.SphereGeometry(.28,20,16),tmat(COL.vent,{roughness:.3,emissive:0x12302c,emissiveIntensity:.3,transparent:true,opacity:.85}));
-    v.position.set(.3*s,.28,-.05);v.scale.set(.4,1,1.35);v.userData.info={name:'Lateral ventricle',role:'CSF space; enlarges as brain tissue is lost.'};root.add(v);brain.inner.push(v);});
-  {const l=label('Lateral ventricle','#bfe0d8',.28,{name:'Lateral ventricle',role:'CSF space; enlarges as brain tissue is lost.'});l.position.set(.55,.6,-.05);root.add(l);brain.innerLabels.push(l);}
-  const bs=new THREE.Group();
-  bs.add(mkPart(COL.stem,.24,.2,.55,[0,-.55,-.35]));
-  const pons=new THREE.Mesh(new THREE.SphereGeometry(.3,22,18),tmat(COL.stem));pons.position.set(0,-1,-.25);pons.scale.set(1,.9,1.15);bs.add(pons);
-  bs.add(mkPart(COL.stem,.17,.24,.7,[0,-1.5,-.15]));
-  root.add(bs);bs.children.forEach(c=>brain.shells.push(c)); tagInfo(bs,'Brainstem','Vital functions; relays signals between brain and body.');
-  {const l=label('Brainstem','#e8c7ac',.36,{name:'Brainstem',role:'Vital functions; relays signals between brain and body.'});l.position.set(0,-1.55,.35);root.add(l);}
-  const cbl=new THREE.Mesh(gyri(.62,.06,16),tmat(COL.cbl));cbl.position.set(0,-1,-1.2);cbl.scale.set(1.3,.78,1);root.add(cbl);brain.shells.push(cbl);
-  tagInfo(cbl,'Cerebellum','Balance, coordination & motor timing.');
-  const cblCore=new THREE.Mesh(new THREE.SphereGeometry(.34,20,16),tmat(COL.cblCore));cblCore.position.copy(cbl.position);cblCore.scale.set(1.1,.6,.8);root.add(cblCore);brain.inner.push(cblCore);
-  tagInfo(cblCore,'Cerebellum','Balance, coordination & motor timing.');
-  {const l=label('Cerebellum','#f0cbb8',.38,{name:'Cerebellum',role:'Balance, coordination & motor timing.'});l.position.set(0,-1.55,-1.5);root.add(l);}
-  {const l=label('Cerebral cortex','#f2d6ca',.42,{name:'Cerebral cortex',role:'Outer grey matter, thinking, memory, reasoning.'});l.position.set(0,1.85,0);root.add(l);}
+  brain.hip=new THREE.Group(); root.add(brain.hip);
+  const hipInfo={name:'Hippocampus',role:'Learning & memory; atrophies early in Alzheimer’s.'};
+  ['hippocampusL','hippocampusR'].forEach(k=>{const m=realMesh(k,brain.hipMat,hipInfo.name,hipInfo.role); brain.hip.add(m);});
+  // callouts (≤10 on screen; text lives outside the silhouette, leader lines point in)
+  callout('Cerebral cortex','#f2d6ca',[cxL,cxR],cxL.userData.info,false,new THREE.Vector3(0,1.1,.3),true);
+  callout('Cerebellum','#f0cbb8',cbl,cbl.userData.info,false);
+  callout('Brainstem','#e8c7ac',bs,bs.userData.info,false,new THREE.Vector3(0,-.55,0));
+  callout('Hippocampus','#f0c6ac',brain.hip.children,hipInfo,false);
+  callout('Corpus callosum','#dfe8f2',cc,cc.userData.info,true,new THREE.Vector3(0,.15,0));
+  callout('Thalamus','#dfe8f2',thal,thal[0].userData.info,true);
+  callout('Basal ganglia (striatum)','#dfe8f2',[...caud,...put],{name:'Basal ganglia (striatum)',role:'Caudate + putamen: movement & reward; dopamine target of the substantia nigra.'},true);
+  callout('Amygdala','#dfe8f2',amyg,amyg[0].userData.info,true);
+  callout('Lateral ventricle','#bfe0d8',vent,vent[0].userData.info,true);
+  callout('Substantia nigra','#dfe8f2',brain.sn.children,snInfo,true);
+  // leader lines + anchor dots (screen-space overlay, rebuilt each frame)
+  const N=brain.labels.length;
+  brain.leaders=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0xf4ece4,transparent:true,opacity:.75,depthTest:false}));
+  brain.leaders.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(N*6),3)); brain.leaders.renderOrder=998; brain.leaders.raycast=()=>{}; root.add(brain.leaders);
+  brain.dots=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({color:0xf4ece4,size:5,sizeAttenuation:false,depthTest:false}));
+  brain.dots.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(N*3),3)); brain.dots.renderOrder=998; brain.dots.raycast=()=>{}; root.add(brain.dots);
+  // silhouette: bounding sphere of the whole cerebrum, used to push labels outside it
+  const box=new THREE.Box3().setFromObject(cxL).union(new THREE.Box3().setFromObject(cxR));
+  brain.centre=box.getCenter(new THREE.Vector3()); brain.radius=box.getSize(new THREE.Vector3()).length()/2*.92;
   brain.plaques=[];const pg=new THREE.SphereGeometry(.06,10,10),pm=tmat(COL.plaque,{emissive:0x3a0f08,emissiveIntensity:.4,roughness:.4});
-  for(let i=0;i<60;i++){const a=i*2.399,rr=.4+((i*13)%9)/10,yy=(((i*7)%11)/11-.5)*1.8;
-    const m=new THREE.Mesh(pg,pm);m.position.set(Math.cos(a)*rr*1.2,yy,Math.sin(a)*rr*1.25);m.visible=false;m.userData.info={name:'Amyloid-β plaque',role:'Toxic protein clump, a hallmark of Alzheimer’s.'};root.add(m);brain.plaques.push(m);}
+  for(let i=0;i<60;i++){const cx=i%2?cxL:cxR, P=cx.geometry.attributes.position, k=(i*331)%P.count;   // pseudo-random cortex vertex, just under the pia
+    const m=new THREE.Mesh(pg,pm);m.position.set(P.getX(k),P.getY(k),P.getZ(k)).multiplyScalar(.96).add(cx.position);m.visible=false;m.userData.info={name:'Amyloid-β plaque',role:'Toxic protein clump, a hallmark of Alzheimer’s.'};root.add(m);brain.plaques.push(m);}
   brain.sparks=[];const sg=new THREE.SphereGeometry(.035,8,8),sm=new THREE.MeshBasicMaterial({color:COL.spark});
-  for(let i=0;i<40;i++){const m=new THREE.Mesh(sg,sm);m.visible=false;hipGrp.add(m);brain.sparks.push(m);
-    const a=i*2.4;m.position.set(Math.cos(a)*.7*(i%2?1:-1),-.2+((i*5)%7)/7*.3,Math.sin(a)*.5);}
-  brain.blood=new THREE.Mesh(new THREE.SphereGeometry(1.95,32,24),new THREE.MeshBasicMaterial({color:COL.blood,transparent:true,opacity:.05,side:THREE.BackSide}));
-  brain.blood.scale.set(...XS);root.add(brain.blood);
+  for(let i=0;i<40;i++){const m=new THREE.Mesh(sg,sm);m.visible=false;root.add(m);brain.sparks.push(m);
+    const h=brain.hip.children[i%2], r=h.userData.r, a=i*2.4;
+    m.position.copy(h.position).add(new THREE.Vector3(Math.cos(a)*.35*r,(((i*5)%7)/7-.5)*.5*r,Math.sin(a)*.8*r));}
+  brain.blood=new THREE.Mesh(new THREE.SphereGeometry(1,32,24),new THREE.MeshBasicMaterial({color:COL.blood,transparent:true,opacity:.05,side:THREE.BackSide}));
+  brain.blood.position.copy(brain.centre); brain.blood.scale.copy(box.getSize(new THREE.Vector3()).multiplyScalar(.62)); root.add(brain.blood);
   setGhost(15);setDissect(100);updateInnerVis();
   setupInspect(brain,'#brainInspect');
   animateBrain();
 }
 function setGhost(v){const o=clamp((115-v)/100,.15,1);brain.shells.forEach(m=>{if(m.material){m.material.opacity=o;m.material.transparent=true;m.material.depthWrite=o>.95;}});} // slider right = more transparent
 function setDissect(v){brain.clip.constant=(v/100)*CMAX;}
-function updateInnerVis(){const show=(+$('#ghost').value>43)||(+$('#dissect').value<96);brain.innerLabels.forEach(l=>l.visible=show);}
+function updateInnerVis(){brain.showInner=(+$('#ghost').value>43)||(+$('#dissect').value<96);}
+// Per-frame label layout (see callout): project each anchor, push the text radially outside the projected
+// brain silhouette, sort into left/right sides and space rows apart so no label covers anatomy or another label.
+const _a=new THREE.Vector3(),_b=new THREE.Vector3();
+function layoutLabels(){
+  const cam=brain.cam,W=brain.r.domElement.clientWidth,H=brain.r.domElement.clientHeight,PX=17,ROW=PX+7,GAP=26;
+  const depth=-_a.copy(brain.centre).applyMatrix4(cam.matrixWorldInverse).z;
+  const pxPerWorld=(H/2)/(Math.tan(cam.fov*Math.PI/360)*depth), Rpx=brain.radius*pxPerWorld;
+  const cp=_a.copy(brain.centre).project(cam), cx=(cp.x+1)/2*W, cy=(1-cp.y)/2*H, zN=cp.z;
+  const sides={l:[],r:[],t:[]};
+  for(const L of brain.labels){
+    L.on=false; if(L.inner&&!brain.showInner){L.sp.visible=false;continue;}
+    let best=null,bd=1e9;
+    for(const t of L.targets){
+      t.getWorldPosition(_b); const r=(t.userData.r||.3)*t.scale.x;
+      if(L.fixed) _b.add(L.fixed); else _b.add(_a.copy(cam.position).sub(_b).normalize().multiplyScalar(r*.85)); // surface point facing the camera
+      if(brain.clip.distanceToPoint(_b)<0) continue;                                                            // dissected away
+      const d=_b.distanceToSquared(cam.position); if(d<bd){bd=d;best=_b.clone();}
+    }
+    if(!best){L.sp.visible=false;continue;}
+    L.on=true; L.anchor.copy(best);
+    const p=best.clone().project(cam), ax=(p.x+1)/2*W, ay=(1-p.y)/2*H;
+    L.w=L.sp._aspect*PX;
+    if(L.top){ L.x=ax; L.y=Math.min(ay,cy-Rpx)-GAP; sides.t.push(L); continue; }              // above the silhouette
+    const r=ax>=cx; L.y=ay; L.x=r?Math.max(cx+Rpx,ax)+GAP:Math.min(cx-Rpx,ax)-GAP;             // column just outside the silhouette
+    sides[r?'r':'l'].push(L);
+  }
+  const Y0=44,Y1=H-40;                                                       // keep clear of the corner tags
+  for(const s in sides){ const arr=sides[s].sort((a,b)=>a.y-b.y);
+    for(const L of arr) L.y=clamp(L.y,Y0,Y1);
+    for(let i=1;i<arr.length;i++) if(arr[i].y<arr[i-1].y+ROW) arr[i].y=arr[i-1].y+ROW;
+    for(let i=arr.length-1;i>=0;i--){ const lim=i===arr.length-1?Y1:arr[i+1].y-ROW; if(arr[i].y>lim) arr[i].y=lim; }   // relax back up if pushed off the bottom
+    for(const L of arr){
+      if(s==='t'){ L.x=clamp(L.x,8+L.w/2,W-8-L.w/2); L.sp.center.set(.5,.5); }
+      else { L.x=s==='r'?clamp(L.x,0,W-8-L.w):clamp(L.x,8+L.w,W); L.sp.center.set(s==='r'?0:1,.5); }
+      L.sp.position.set(L.x/W*2-1,1-L.y/H*2,zN).unproject(cam);
+      L.sp.scale.set(L.w/pxPerWorld,PX/pxPerWorld,1); L.sp.visible=true;
+    }}
+  const lp=brain.leaders.geometry.attributes.position, dp=brain.dots.geometry.attributes.position; let n=0;
+  for(const L of brain.labels){ if(!L.on) continue;
+    lp.setXYZ(n*2,L.anchor.x,L.anchor.y,L.anchor.z); lp.setXYZ(n*2+1,L.sp.position.x,L.sp.position.y,L.sp.position.z);
+    dp.setXYZ(n,L.anchor.x,L.anchor.y,L.anchor.z); n++; }
+  lp.needsUpdate=dp.needsUpdate=true; brain.leaders.geometry.setDrawRange(0,n*2); brain.dots.geometry.setDrawRange(0,n);
+}
 function updateBrain(){
   if(!brain.hip)return;const tr=brain._tr,m=state.month;
   const hip=tr.hippo[m],plaque=tr.plaque[m],cbf=tr.cbf[m],neuro=tr.neuro[m],dopa=tr.dopa[m];
-  if(brain.sn){ const f=dopa/100; brain.sn.scale.setScalar(0.55+0.45*f);
-    brain.sn.children.forEach(c=>{ if(c.material) c.material.color.copy(lerpC(new THREE.Color(0x6f6153),new THREE.Color(COL.nigra),f)); }); }
-  brain.hip.scale.setScalar(clamp(hip/100,.6,1.08));
+  if(brain.sn){ const f=dopa/100;
+    brain.sn.children.forEach(c=>{ c.scale.copy(c.userData.base).multiplyScalar(0.55+0.45*f); c.material.color.copy(lerpC(new THREE.Color(0x6f6153),new THREE.Color(COL.nigra),f)); }); }
+  brain.hip.children.forEach(c=>c.scale.setScalar(clamp(hip/100,.6,1.08)));
   brain.hipMat.color.copy(lerpC(new THREE.Color(0x8a7a70),new THREE.Color(COL.hippo),(hip-60)/48));
   brain.hipMat.emissiveIntensity=.1+.35*neuro/100;
   const nP=Math.round(plaque/100*60);brain.plaques.forEach((p,i)=>p.visible=i<nP);
@@ -399,7 +461,7 @@ function updateBrain(){
 function animateBrain(){
   requestAnimationFrame(animateBrain);
   if(!isActive('sim')) return;
-  brain.ctrl.update(); brain.r.render(brain.scene, brain.cam);
+  brain.ctrl.update(); layoutLabels(); brain.r.render(brain.scene, brain.cam);
 }
 
 /* ============================================================
