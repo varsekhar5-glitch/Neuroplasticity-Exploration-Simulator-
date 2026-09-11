@@ -274,9 +274,11 @@ function label(text, color='#dfe8f2', scale=0.34, info=null, plain=false){
    3b. 3D BRAIN, dissectable, layered anatomy
    ============================================================ */
 /* ---- anatomical tissue colors, sampled from fresh-tissue photos & atlas plates ---- */
-const COL={cortex:0xc8a094,white:0xe8dccb,hippo:0xc7957e,thal:0xb9917d,striat:0xc69684,
-  pallid:0xd4b39e,nigra:0x3f2c29,amyg:0xbe8a78,cbl:0xb8978a,stem:0xd6c5b0,vdc:0xcdb8a6,
-  vent:0x9fb8bd,callosum:0xeee3d3,plaque:0xbf3b2b,spark:0x9ccf6a,blood:0xb8322e};
+/* shells keep true tissue tones; inner structures are atlas colour-coded (one distinct hue each,
+   warm/green/teal only) so they read clearly through the ghosted cortex in X-ray mode */
+const COL={cortex:0xc8a094,white:0xe8dccb,hippo:0xf2853d,thal:0xe0b23e,striat:0x79c46b,
+  pallid:0xefe19a,nigra:0x4a2a1e,amyg:0xd9455f,cbl:0xb8978a,stem:0xd6c5b0,vdc:0xc7a97f,
+  vent:0x6fd3cc,callosum:0xfff3dc,plaque:0xff4a3a,spark:0xc8ff5a,blood:0xb8322e};
 const CMAX=2.0;
 const brain={clip:new THREE.Plane(new THREE.Vector3(1,0,0),CMAX)};
 function tmat(color,extra){return new THREE.MeshStandardMaterial(Object.assign({color,roughness:.72,metalness:.02,clippingPlanes:[brain.clip]},extra));}
@@ -333,11 +335,11 @@ function setSection(axis){ const n=SECT[axis]||SECT.sagittal; brain.axis=axis; b
   $('#sectSeg')&&$('#sectSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.sect===axis)); }
 function initBrain(){
   const vp=$('#brainVP');Object.assign(brain,makeScene(vp),brain);
-  brain.cam.position.set(-5.2,1.3,4.6); brain.ctrl.target.set(0,-.2,0);   // left lateral, slightly anterior; room for callouts
+  brain.cam.position.set(-3.95,1.0,3.5); brain.ctrl.target.set(0,-.15,0);   // left lateral, slightly anterior; fills the viewport, callout columns fit at the edges
   const root=new THREE.Group();brain.scene.add(root);brain.root=root;
   brain.shells=[];brain.labels=[];brain.showInner=false;
   const shell=(k,col,name,role,extra)=>{const m=realMesh(k,tmat(col,Object.assign({transparent:true,side:THREE.DoubleSide},extra)),name,role);brain.shells.push(m);return m;};
-  const part=(k,col,name,role,extra)=>{const m=realMesh(k,tmat(col,Object.assign({roughness:.55},extra)),name,role);return m;};
+  const part=(k,col,name,role,extra)=>realMesh(k,tmat(col,Object.assign({roughness:.5,emissive:col,emissiveIntensity:.22},extra)),name,role);
   const cxL=shell('cortexL',COL.cortex,'Cerebral cortex','Outer grey matter, thinking, memory, reasoning.',{roughness:.6});
   const cxR=shell('cortexR',COL.cortex,'Cerebral cortex','Outer grey matter, thinking, memory, reasoning.',{roughness:.6});
   const wm=['whiteL','whiteR'].filter(k=>BRAIN_MESHES[k]).map(k=>shell(k,COL.white,'White matter','Myelinated axon tracts wiring regions together.'));
@@ -350,7 +352,7 @@ function initBrain(){
   pair('accumbens',COL.striat,'Nucleus accumbens','Reward hub of the ventral striatum; dopamine target.');
   const amyg=pair('amygdala',COL.amyg,'Amygdala','Emotion & fear processing.');
   const vdc=pair('ventralDC',COL.vdc,'Midbrain / ventral diencephalon','Hypothalamus, subthalamic nucleus & cerebral peduncles; houses the substantia nigra.');
-  const vent=pair('ventricle',COL.vent,'Lateral ventricle','CSF space; enlarges as brain tissue is lost.',{roughness:.3,emissive:0x12302c,emissiveIntensity:.3,transparent:true,opacity:.85});
+  const vent=pair('ventricle',COL.vent,'Lateral ventricle','CSF space; enlarges as brain tissue is lost.',{roughness:.3,emissiveIntensity:.35,transparent:true,opacity:.9});
   part('ventricle3',COL.vent,'Third ventricle','CSF space between the two thalami.',{roughness:.3,transparent:true,opacity:.85});
   part('ventricle4',COL.vent,'Fourth ventricle','CSF space between brainstem and cerebellum.',{roughness:.3,transparent:true,opacity:.85});
   const bs=shell('brainstem',COL.stem,'Brainstem','Vital functions; relays signals between brain and body.',{roughness:.6});
@@ -359,10 +361,10 @@ function initBrain(){
   // so placed at the ventral-diencephalon centroid). Shrinks & fades with dopamine in Parkinson's mode.
   brain.sn=new THREE.Group(); root.add(brain.sn);
   const snInfo={name:'Substantia nigra',role:'Dopamine source; degenerates in Parkinson’s disease.'};
-  vdc.forEach(v=>{const m=new THREE.Mesh(new THREE.SphereGeometry(1,24,18),tmat(COL.nigra,{roughness:.5}));
+  vdc.forEach(v=>{const m=new THREE.Mesh(new THREE.SphereGeometry(1,24,18),tmat(COL.nigra,{roughness:.5,emissive:0x3a1408,emissiveIntensity:.5}));
     m.position.copy(v.position).add(new THREE.Vector3(0,-.04,-.06)); m.scale.set(.09,.045,.2); m.userData.base=m.scale.clone(); m.userData.r=.2; m.userData.info=snInfo; brain.sn.add(m);});
   // hippocampus: shared material so colour/emissive track the sim; each side scales about its own centroid
-  brain.hipMat=tmat(COL.hippo,{roughness:.5,emissive:0x2a1206,emissiveIntensity:.25});
+  brain.hipMat=tmat(COL.hippo,{roughness:.5,emissive:COL.hippo,emissiveIntensity:.25});
   brain.hip=new THREE.Group(); root.add(brain.hip);
   const hipInfo={name:'Hippocampus',role:'Learning & memory; atrophies early in Alzheimer’s.'};
   ['hippocampusL','hippocampusR'].forEach(k=>{const m=realMesh(k,brain.hipMat,hipInfo.name,hipInfo.role); brain.hip.add(m);});
@@ -370,13 +372,13 @@ function initBrain(){
   callout('Cerebral cortex','#f2d6ca',[cxL,cxR],cxL.userData.info,false,new THREE.Vector3(0,1.1,.3),true);
   callout('Cerebellum','#f0cbb8',cbl,cbl.userData.info,false);
   callout('Brainstem','#e8c7ac',bs,bs.userData.info,false,new THREE.Vector3(0,-.55,0));
-  callout('Hippocampus','#f0c6ac',brain.hip.children,hipInfo,false);
-  callout('Corpus callosum','#dfe8f2',cc,cc.userData.info,true,new THREE.Vector3(0,.15,0));
-  callout('Thalamus','#dfe8f2',thal,thal[0].userData.info,true);
-  callout('Basal ganglia (striatum)','#dfe8f2',[...caud,...put],{name:'Basal ganglia (striatum)',role:'Caudate + putamen: movement & reward; dopamine target of the substantia nigra.'},true);
-  callout('Amygdala','#dfe8f2',amyg,amyg[0].userData.info,true);
-  callout('Lateral ventricle','#bfe0d8',vent,vent[0].userData.info,true);
-  callout('Substantia nigra','#dfe8f2',brain.sn.children,snInfo,true);
+  callout('Hippocampus','#ffa66a',brain.hip.children,hipInfo,false);
+  callout('Corpus callosum','#fff3dc',cc,cc.userData.info,true,new THREE.Vector3(0,.15,0));
+  callout('Thalamus','#f5cd5a',thal,thal[0].userData.info,true);
+  callout('Basal ganglia (striatum)','#9ee08c',[...caud,...put],{name:'Basal ganglia (striatum)',role:'Caudate + putamen: movement & reward; dopamine target of the substantia nigra.'},true);
+  callout('Amygdala','#ff7a92',amyg,amyg[0].userData.info,true);
+  callout('Lateral ventricle','#8ff0e6',vent,vent[0].userData.info,true);
+  callout('Substantia nigra','#d9906a',brain.sn.children,snInfo,true);
   // leader lines + anchor dots (screen-space overlay, rebuilt each frame)
   const N=brain.labels.length;
   brain.leaders=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0xf4ece4,transparent:true,opacity:.75,depthTest:false}));
@@ -386,10 +388,10 @@ function initBrain(){
   // silhouette: bounding sphere of the whole cerebrum, used to push labels outside it
   const box=new THREE.Box3().setFromObject(cxL).union(new THREE.Box3().setFromObject(cxR));
   brain.centre=box.getCenter(new THREE.Vector3()); brain.radius=box.getSize(new THREE.Vector3()).length()/2*.92;
-  brain.plaques=[];const pg=new THREE.SphereGeometry(.06,10,10),pm=tmat(COL.plaque,{emissive:0x3a0f08,emissiveIntensity:.4,roughness:.4});
+  brain.plaques=[];const pg=new THREE.SphereGeometry(.06,10,10),pm=tmat(COL.plaque,{emissive:0x8a1a0c,emissiveIntensity:.6,roughness:.4});
   for(let i=0;i<60;i++){const cx=i%2?cxL:cxR, P=cx.geometry.attributes.position, k=(i*331)%P.count;   // pseudo-random cortex vertex, just under the pia
     const m=new THREE.Mesh(pg,pm);m.position.set(P.getX(k),P.getY(k),P.getZ(k)).multiplyScalar(.96).add(cx.position);m.visible=false;m.userData.info={name:'Amyloid-β plaque',role:'Toxic protein clump, a hallmark of Alzheimer’s.'};root.add(m);brain.plaques.push(m);}
-  brain.sparks=[];const sg=new THREE.SphereGeometry(.035,8,8),sm=new THREE.MeshBasicMaterial({color:COL.spark});
+  brain.sparks=[];const sg=new THREE.SphereGeometry(.045,8,8),sm=new THREE.MeshBasicMaterial({color:COL.spark});
   for(let i=0;i<40;i++){const m=new THREE.Mesh(sg,sm);m.visible=false;root.add(m);brain.sparks.push(m);
     const h=brain.hip.children[i%2], r=h.userData.r, a=i*2.4;
     m.position.copy(h.position).add(new THREE.Vector3(Math.cos(a)*.35*r,(((i*5)%7)/7-.5)*.5*r,Math.sin(a)*.8*r));}
@@ -452,7 +454,7 @@ function updateBrain(){
     brain.sn.children.forEach(c=>{ c.scale.copy(c.userData.base).multiplyScalar(0.55+0.45*f); c.material.color.copy(lerpC(new THREE.Color(0x6f6153),new THREE.Color(COL.nigra),f)); }); }
   brain.hip.children.forEach(c=>c.scale.setScalar(clamp(hip/100,.6,1.08)));
   brain.hipMat.color.copy(lerpC(new THREE.Color(0x8a7a70),new THREE.Color(COL.hippo),(hip-60)/48));
-  brain.hipMat.emissiveIntensity=.1+.35*neuro/100;
+  brain.hipMat.emissiveIntensity=.15+.35*neuro/100;
   const nP=Math.round(plaque/100*60);brain.plaques.forEach((p,i)=>p.visible=i<nP);
   const nS=Math.round(neuro/100*40);brain.sparks.forEach((p,i)=>p.visible=i<nS);
   brain.blood.material.opacity=.03+.16*cbf/100;
