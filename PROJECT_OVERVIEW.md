@@ -3,7 +3,7 @@
 ## What it is
 The **Neuroplasticity Exploration Simulator** is an interactive, browser-based 3D neuroscience laboratory that lets anyone *see and manipulate* the biology behind two of my research papers on **neuroplasticity** — the brain's ability to rewire and heal itself. It turns abstract mechanisms (biomarkers, brain atrophy, protein misfolding, dopamine loss) into living, rotatable, dissectible 3D models that respond in real time to lifestyle interventions and genetic risk.
 
-It is also a **self-validating computational model**: a 54-source machine-readable literature base feeds the model's coefficients, and a built-in Validation & Metrics panel continuously compares every simulated run against published clinical-trial endpoints (Alzheimer's *and* Parkinson's), reporting the residual error honestly instead of hiding it. The unifying thesis: neuroplasticity is a shared therapeutic pathway across neurodegenerative diseases — the same four lifestyle levers act on it in Alzheimer's (memory system), Parkinson's (dopamine/motor system), and under APOE4 genetic risk (the dial that modulates both). Prepared as an ISEF project (Translational Medical Science).
+It is also a **self-validating computational model**: a machine-readable literature base (118 verified evidence rows from 96 published articles, as of 2026-09-15) feeds the model's coefficients, its trial benchmarks, and the clinical-unit display anchors, and a built-in Validation & Metrics panel continuously compares every simulated run against published clinical-trial endpoints (Alzheimer's *and* Parkinson's), reporting the residual error honestly instead of hiding it. The unifying thesis: neuroplasticity is a shared therapeutic pathway across neurodegenerative diseases — the same four lifestyle levers act on it in Alzheimer's (memory system), Parkinson's (dopamine/motor system), and under APOE4 genetic risk (the dial that modulates both). Prepared as an ISEF project (Translational Medical Science).
 
 It opens on a cinematic landing screen, then has three interactive modules plus a knowledge graph:
 0. **Landing / "Enter the lab"** — a living neural-network animation (firing neurons, dendrites, traveling action potentials) behind the why-I-built-this story, with a liquid-glass entry button.
@@ -161,7 +161,7 @@ Every **direction** of effect in the models is grounded in the peer-reviewed lit
 
 ## Files
 - `index.html`, `styles.css`, `app.js` — the app (only dependency: Three.js, vendored locally in `vendor/`)
-- `research/` — the two source papers, a PDF (with Works Cited) of the chronic-illness paper, **`literature.csv`** (the 54-row evidence base), and **`build_benchmarks.py`** (the conversion script)
+- `research/` — the two source papers, a PDF (with Works Cited) of the chronic-illness paper, **`literature.csv`** (the evidence base, 118 rows / 96 articles; the app reads the live count from `benchmarks.json`), and **`build_benchmarks.py`** (the conversion script)
 - `benchmarks.json` — generated trial-endpoint data the app loads at boot (regenerate with `python3 research/build_benchmarks.py`; edit the CSV, not this file)
 - `graphify-out/graph.html` — the interactive knowledge graph
 - `README.md` — quick start

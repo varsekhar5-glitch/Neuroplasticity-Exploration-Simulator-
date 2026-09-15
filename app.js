@@ -923,11 +923,52 @@ function buildGauges(tr){
     const v=tr[g.k][m], v0=tr[g.k][0], d=v-v0, pct=v/g.max*100;
     const col=g.good?(pct>55?'#5fae7a':pct>35?'#d1a53c':'#e2705f'):(pct<40?'#5fae7a':pct<65?'#d1a53c':'#e2705f');
     const gd=g.good?d>=0:d<=0; const arrow=d>0?'▲':d<0?'▼':'–';
-    return `<div class="g"><div class="gt"><b>${g.lab}</b><span class="gv">${v.toFixed(1)}
+    const real=unitOf(g.k)!=='idx' && g.k!=='cog' && g.k!=='updrs' ? ` <span style="color:var(--dim2);font-size:10.5px">≈ ${fmtReal(g.k,v)} ${unitOf(g.k)}</span>` : '';
+    return `<div class="g"><div class="gt"><b>${g.lab}</b><span class="gv">${v.toFixed(1)}${real}
       <span class="delta ${gd?'up':'down'}">${arrow}${Math.abs(d).toFixed(1)}</span></span></div>
       <div class="bar"><i style="width:${clamp(pct,0,100)}%;background:${col}"></i></div></div>`;
   }).join('');
 }
+/* ---- real-unit display (2026-09-15) ----------------------------------------
+   Model indices are illustrative 0–100 scales. Their DELTAS were calibrated with
+   the documented rule "20 index points = 1 SD" (see W header), so display runs
+   the same rule in reverse:  real = clinical mean + (idx − idx₀) × SD/20, where
+   idx₀ is the untreated, APOE-ε4-free month-0 index (the model's early-AD
+   starting point) and mean ± SD is the matching early-AD/MCI population value.
+   Ratio-scale quantities (hippocampal % of baseline, centiloids, DAT binding)
+   scale proportionally instead. Sources verified from fetched abstracts/full
+   texts; rows are in research/literature.csv under units.*  ---------------- */
+const UNITS={
+  bdnf:  { unit:'ng/mL', how:'serum BDNF (ELISA)', ref:28.9, sd:13.6, d:1,
+           cite:'Mori et al. 2021, Front Neurol (PMC8102980): MCI due to AD 28.9 ± 13.6; cognitively normal 35.7 ± 13.4; AD 31.4 ± 11.8 ng/mL, same assay across groups' },
+  cbf:   { unit:'mL/100g/min', how:'cortical gray-matter cerebral blood flow (ASL MRI)', ref:45, sd:8, d:0,
+           cite:'Binnewijzend et al. 2016, Eur Radiol (PMID 26040647): Aβ+/tau+ non-demented 45 ± 8; controls 48 ± 8; AD 43 ± 8 mL/100g/min' },
+  inflam:{ unit:'pg/mL', how:'serum interleukin-6 (IL-6)', ref:5.2, sd:2.8, d:1,
+           cite:'Anchor 5.2 = healthy-older median 2.3 pg/mL (Puzianowska-Kuznicka 2016, PolSenior n=3,496, PMID 27274758) + AD−control difference +2.86 pg/mL [1.68, 4.04] (Swardfager 2010 meta, 14 studies, PMID 20692646); SD 2.8 from an age-matched AD cohort (Yeram 2021, AD 10.3 ± 2.8 vs controls 3.4 ± 0.8, PMID 34604020)' },
+  npi:   { unit:'× baseline MEP', how:'LTP-like cortical plasticity, TMS: motor-evoked potential after iTBS ÷ before (1.00 = no plasticity)', ref:1.09, sd:0.49, d:2,
+           cite:'Brem et al. 2020, Front Aging Neurosci (PMID 32733232): mild–moderate AD 1.09 ± 0.49 vs age-matched controls 1.45 ± 0.60 (+9% vs +45%); Chou 2022 meta (PMID 35680080): AD vs normal d = 1.20, MCI d = 0.86' },
+  hippo: { unit:'mm³', how:'bilateral hippocampal volume (structural MRI); 100% = 3,692 mm³', scale:36.92, d:0,
+           cite:'Schuff et al. 2009, Brain (PMID 19251758), ADNI 1.5T: MCI 1,846 ± 348 mm³ per hemisphere (normal 2,133; mild AD 1,631)' },
+  plaque:{ unit:'CL', how:'amyloid PET, Centiloid scale', scale:1, d:0,
+           cite:'Klunk et al. 2015, Alzheimers Dement (PMID 25443857): 0 CL = young controls, 100 CL = typical AD; positivity ≈ 12 CL emerging / 24–30 CL established (Salvadó 2019, La Joie 2019)' },
+  dopa:  { unit:'SBR', how:'putamen dopamine-transporter binding, DAT-SPECT specific binding ratio', d:2,
+           scaleFn:()=> (state.pd ? 0.83 : 2.147)/88,
+           cite:'Marek et al. 2018, Ann Clin Transl Neurol (PMID 30564614): PPMI healthy controls putamen 2.147 ± 0.555; Simuni et al. 2018, Mov Disord (PMID 29572948): de novo PD mean putamen 0.83 ± 0.3. Non-PD mode anchors the 88-point baseline to the control value, PD mode to the de novo PD value' },
+  cog:   { unit:'pts', how:'MMSE, 0–30', scale:1, d:1, cite:'' },
+  updrs: { unit:'pts', how:'MDS-UPDRS-III motor score', scale:1, d:1, cite:'' },
+};
+let REF_IDX=null;   // untreated, APOE-ε4-free month-0 indices = idx₀ above
+function toReal(k, idx){
+  const u=UNITS[k]; if(!u) return idx;
+  if(u.scaleFn) return idx*u.scaleFn();
+  if(u.scale!=null) return idx*u.scale;
+  if(u.ref==null) return idx;                       // anchor not yet available → show the index
+  if(!REF_IDX) REF_IDX=trajectory({o3:0,ex:0,cst:0,med:0,apoe:0,pd:false});
+  return u.ref + (idx-REF_IDX[k][0])*u.sd/20;
+}
+const unitOf=k=>UNITS[k]&&UNITS[k].ref==null&&UNITS[k].scale==null&&!UNITS[k].scaleFn ? 'idx' : (UNITS[k]||{}).unit||'';
+const fmtReal=(k,idx)=>toReal(k,idx).toFixed((UNITS[k]||{}).d ?? 1);
+
 /* ---- plain-English scoreboard: % difference vs. untreated at current month ---- */
 const SCORE=[
   ['bdnf',  'BDNF, the "brain fertilizer" that helps brain cells grow &amp; connect', true],
@@ -942,13 +983,18 @@ const SCORE=[
 function buildScoreboard(tr, base){
   const m=state.month;
   const score = state.pd ? SCORE.concat([['updrs','Parkinson’s motor score (UPDRS-III, lower is better)', false]]) : SCORE;
-  $('#scoreTbl').innerHTML='<tr><th>Factor</th><th>Your plan</th><th>Doing nothing</th><th>Difference</th></tr>'+
+  $('#scoreTbl').innerHTML='<tr><th>Factor</th><th>Your plan</th><th>Doing nothing</th><th>Difference</th><th>vs. doing nothing</th></tr>'+
     score.map(([k,lab,goodUp])=>{
-      const a=tr[k][m], b=base[k][m], pct=b?(a-b)/b*100:0;
-      const better=goodUp?pct>=0:pct<=0;
-      const col=Math.abs(pct)<0.05?'var(--dim)':better?'var(--good)':'var(--bad)';
-      const arrow=pct>0.05?'▲':pct<-0.05?'▼':'–';
-      return `<tr><td>${lab}</td><td>${a.toFixed(1)}</td><td>${b.toFixed(1)}</td><td style="color:${col}">${arrow} ${pct>0?'+':''}${pct.toFixed(1)}%</td></tr>`;
+      // compare in real units; relative % = (plan − nothing) ÷ nothing
+      const a=toReal(k,tr[k][m]), b=toReal(k,base[k][m]), diff=a-b, unit=unitOf(k), dp=(UNITS[k]||{}).d ?? 1;
+      const pct=Math.abs(b)>1e-6?diff/b*100:null;
+      const better=goodUp?diff>=0:diff<=0;
+      const col=Math.abs(diff)<Math.pow(10,-dp)/2?'var(--dim)':better?'var(--good)':'var(--bad)';
+      const arrow=diff>0?'▲':diff<0?'▼':'–';
+      const sgn=v=>(v>0?'+':'')+v.toFixed(dp);
+      return `<tr><td>${lab}</td><td>${a.toFixed(dp)} ${unit}</td><td>${b.toFixed(dp)} ${unit}</td>
+        <td style="color:${col}">${arrow} ${sgn(diff)} ${unit}</td>
+        <td style="color:${col}">${pct==null?'–':(pct>0?'+':'')+pct.toFixed(1)+'%'}</td></tr>`;
     }).join('');
 }
 
@@ -1015,7 +1061,7 @@ async function loadLiterature(){
         <table class="wt">${'<tr><th>Study</th><th>Design</th><th>Outcome</th><th>Effect</th><th>Model use</th></tr>'}
         ${all.map(e=>`<tr><td>${e.citation.split(',')[0]}</td><td>${e.source_type}</td><td>${e.outcome||''}</td><td>${e.effect_value!=null?e.effect_type+' '+e.effect_value:'qualitative'}</td><td>${e.t}</td></tr>`).join('')}</table>
         <h3>Evidence count</h3>
-        <div class="note"><b>${LIT.n_articles} distinct published articles and reports</b> were used to build and calibrate this model (${LIT.n_sources} extracted evidence rows: meta-analyses, RCTs, cohorts, post-mortem and imaging studies, and reviews), plus 2 institutional fact sheets (NIH/NIA, UW ADRC) and the two companion research papers this simulator accompanies. Every quantitative value was verified against the fetched abstract; PMIDs/DOIs are in the CSV. The model is calibrated to this evidence, not trained on it in the machine-learning sense: each coefficient is set by hand from a cited effect size, and the fit is checked in the Validation panel.</div>`);
+        <div class="note"><b>${LIT.n_articles} distinct published articles and reports</b> underpin this model (${LIT.n_sources} extracted evidence rows: meta-analyses, RCTs, cohorts, post-mortem and imaging studies, and reviews), plus 2 institutional fact sheets (NIH/NIA, UW ADRC) and the two companion research papers this simulator accompanies. They serve three roles: <b>calibrating</b> the intervention → biomarker coefficients, <b>validating</b> the 24-month trajectories against trial endpoints, and <b>anchoring the display units</b> (the population reference values that turn the 0–100 indices into ng/mL, mL/100g/min, mm³, Centiloids and DAT binding ratios; see "Display units" above). Every quantitative value was verified against the fetched abstract; PMIDs/DOIs are in the CSV. The model is calibrated to this evidence, not trained on it in the machine-learning sense: each coefficient is set by hand from a cited effect size, and the fit is checked in the Validation panel.</div>`);
     }
     refresh();
   }catch(e){ /* offline (file://) — hardcoded fallback values stay */ }
@@ -1152,6 +1198,12 @@ function initSci(){
   <div class="cite"><a href="https://www.frontiersin.org/journals/aging-neuroscience/articles/10.3389/fnagi.2025.1620172/full" target="_blank" rel="noopener">Zhao et al., <i>Frontiers in Aging Neuroscience</i> (2025), peripheral BDNF in Parkinson's disease, meta-analysis</a><p>38 studies, 2,589 PD vs 2,422 controls. BDNF SMD −1.04 [−1.41, −0.66]. Quantifies the PD BDNF deficit that Kaagman 2024's large exercise response acts on. Süleymanoğulları 2025 (19 RCTs): no dose-response of BDNF with exercise duration or frequency, so the model keeps linear dose scaling.</p><span class="src">DOI 10.3389/fnagi.2025.1620172 · PubMed 41594760</span></div>
   <div class="cite"><a href="https://www.frontiersin.org/journals/neurology/articles/10.3389/fneur.2026.1860499/full" target="_blank" rel="noopener">Zhang et al., <i>Frontiers in Neurology</i> (2026), mindfulness-based exercise in PD, meta-analysis; and four smaller studies banked as context</a><p>18 RCTs, n=992: UPDRS-III −4.74 [−6.78, −2.70], but the pooled programs are tai chi, yoga, qigong and walking meditation, so it supports movement-based mind-body practice, not seated meditation. Also banked: Fisher 2013 (n=4 PD pilot, treadmill raised D2-receptor binding, mechanism only); Morris 2017 (n=76 early AD, 6-month aerobic: daily function improved, memory null); Sugimoto 2025 (J-MINT MCI subgroup with uncontrolled vascular risk, +0.11 z [0.02, 0.20], main trial null); Innes 2017 (Kirtan Kriya vs music, n=60, both arms improved, no superiority).</p><span class="src">DOI 10.3389/fneur.2026.1860499 · PubMed 23636255 · 28187125 · 41222037 · 28106552</span></div>
   <div class="cite"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3285459/" target="_blank" rel="noopener">Li et al., <i>NEJM</i> (2012), tai chi and postural stability in PD; Li et al., <i>JNNP</i> (2024), long-term tai chi</a><p>NEJM RCT n=195: UPDRS-III −5.02 [−6.90, −3.13] vs stretching, falls IRR 0.33. JNNP 2024 cohort n=330: slower annual UPDRS deterioration over 3.5 years (non-randomised). Tsukita 2022 (PPMI, n=237): sustained activity slowed postural/gait decline (β −0.10 [−0.14, −0.06]).</p><span class="src">PubMed 22316445 · 37875337 · 35022304</span></div>
+  <h3>Display units, how the 0–100 indices become clinical numbers</h3>
+  <p>Internally the model tracks BDNF, blood flow, inflammation and neuroplasticity on illustrative 0–100 indices, and their intervention effects were calibrated with the rule <b>20 index points = 1 standard deviation</b> of the real biomarker (see the coefficient notes above). The scoreboard and gauges run that rule in reverse: <code>real = clinical mean + (index − untreated index) × SD ⁄ 20</code>, anchored at an early-AD / MCI population mean ± SD. Quantities that are already ratio scales (hippocampal % of baseline, Centiloids, DAT binding ratio) scale proportionally. Every anchor below was verified from the fetched abstract or full text; the rows are in <code>research/literature.csv</code> under <code>units.*</code>. These are <i>display conversions</i>, the model was not fitted to these values.</p>
+  <table class="wt">
+    <tr><th>Factor</th><th>Unit</th><th>What is measured</th><th>Anchor &amp; source</th></tr>
+    ${Object.entries(UNITS).filter(([k,u])=>u.cite).map(([k,u])=>`<tr><td>${k==='npi'?'Neuroplasticity index':k==='cbf'?'Blood flow':k==='inflam'?'Inflammation':k==='hippo'?'Hippocampus':k==='plaque'?'Amyloid plaque':k==='dopa'?'Dopamine':k.toUpperCase()}</td><td>${u.unit}</td><td>${u.how}</td><td style="text-align:left">${u.cite}</td></tr>`).join('')}
+  </table>
   <h3>Why there is no synergy term</h3>
   <p>Earlier versions added a cross-product "synergy bonus" when several interventions were combined. It was removed: no published trial combines all four of these interventions, so there is no data to calibrate an interaction effect against (FINGER 2015 has no factorial arms isolating each domain). Combining sliders still helps in the model, but only as the sum of each intervention's own literature-derived effect.</p>
   <div class="note">Coefficients recalibrated 2026-07-12 against real meta-analyses and RCTs (see <code>W</code> object in <code>app.js</code> for full per-coefficient citations, effect sizes, and confidence/population-match flags). Several placeholders were substantially larger than the literature supports and have been reduced, most real intervention→biomarker effects are small-to-moderate, not the dramatic swings the original placeholders implied.</div>

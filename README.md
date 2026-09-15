@@ -11,15 +11,15 @@ cd "Var_NeuroAI_Simulator"
 python3 -m http.server 8777
 ```
 
-Open <http://localhost:8777/index.html>. Needs internet the first time (loads Three.js from a CDN).
+Open <http://localhost:8777/index.html>. Runs fully offline (Three.js is vendored in `vendor/`).
 
 ## What's inside
 
 **🧠 Intervention Simulator**
 - A live, **dissectable** 3D brain. Drag the **X-ray cortex** + **Cross-section** sliders to cut inward and reveal labeled interior anatomy: cortex, white matter, corpus callosum, lateral ventricles, thalamus, basal ganglia, amygdala, substantia nigra, hippocampus, cerebellum, brainstem. Hippocampus grows/shrinks, amyloid plaques appear, cerebral-blood-flow glow and neurogenesis sparks all react to your plan.
-- Sliders for the four interventions + APOE4 copies, a 24-month timeline (scrub or ▶ Play), presets (Untreated / Exercise only / Full synergy).
+- Sliders for the four interventions + APOE4 copies, a 24-month timeline (scrub or ▶ Play), presets (Untreated / Exercise only / All four combined), and an off-by-default Parkinson's mode that adds dopamine decline and a UPDRS-III motor score.
 - Charts: your plan (solid) vs. untreated early-AD baseline (dashed) for cognition, hippocampal volume, neuroplasticity index, plaque, BDNF.
-- A **synergy** term — the paper's core hypothesis that combined treatments beat the sum of parts — that you can toggle and watch.
+- **Validation & metrics**: matches your sliders to the closest published trial (untreated, exercise, omega-3, CST, meditation, multi-domain, Parkinson's) and shows the simulated vs. trial 24-month change with residuals. No synergy term: no trial combines all four interventions, so combined effects are summed, not multiplied.
 - **Tune coefficients**: every effect weight is editable, so the model is a sandbox, not a black box.
 
 **🧬 APOE Genetics Explorer**
@@ -28,15 +28,30 @@ Open <http://localhost:8777/index.html>. Needs internet the first time (loads Th
 - **Structure corrector** toggle (PH002-type) that breaks the Arg61–Glu255 salt bridge — the removable pathogenic part — making ApoE4 behave like ApoE3.
 
 **🔬 Pathology Lab** — two rotatable close-ups:
-- **Parkinson's dopamine circuit**: the substantia nigra → striatum nigrostriatal pathway with dopamine particles flowing along the axons. Slide neuron loss up and dopamine falls, particles thin out, and the whole circuit develops a tremor; slide exercise + meditation up to partly restore it. Live dopamine / motor / tremor gauges.
+- **Parkinson's dopamine circuit**: the substantia nigra → striatum nigrostriatal pathway with dopamine particles flowing along the axons. Slide neuron loss up and dopamine falls, particles thin out, and the whole circuit develops a tremor; slide exercise + mind-body training up to partly restore it. Live dopamine / motor / tremor gauges.
 - **Molecular AD**: a neuron with extracellular amyloid-β fibrils clumping into a plaque, and intracellular tau detaching from microtubules into neurofibrillary tangles. Burden vs. clearance sliders show plaques/tangles appear and microtubule integrity collapse.
 
-**📄 Science & Model Notes** — how the model works and the verified effect directions.
+**📄 Science & Model Notes** — how the model works, every calibration pass, linked citation cards, and the full machine-readable literature table.
+
+## Evidence base
+| | Count |
+|---|---|
+| Distinct published articles and reports in `research/literature.csv` | 96 |
+| Of those, articles that set a model coefficient or validation benchmark | 54 |
+| Articles that anchor the clinical display units (ng/mL, mL/100g/min, mm³, Centiloids, DAT SBR, TMS plasticity) | 10 |
+| Articles banked as context only (direction, mechanism, or null result) | 32 |
+| Extracted evidence rows (one per outcome or subgroup) | 118 |
+| Institutional fact sheets (NIH/NIA, UW ADRC) | 2 |
+| Companion research papers | 2 |
+
+Every quantitative value was verified against the fetched abstract; PMIDs/DOIs are in the CSV. `research/build_benchmarks.py` turns the CSV into `benchmarks.json`, which the app loads at boot. The model is hand-calibrated to these effect sizes, not machine-trained on them.
 
 ## Honesty note
-Every *direction* of effect is grounded in the literature reviewed in the papers (and was independently fact-checked). The *magnitudes* are illustrative and fully tunable. This is a teaching/hypothesis tool, **not** a validated clinical predictor or medical advice.
+Every *direction* of effect is grounded in the literature (and was independently fact-checked). Magnitudes are calibrated to cited effect sizes where they exist, illustrative where they do not, and fully tunable. Where the literature says an intervention does *not* work (omega-3 on structure and cognition, exercise on cognition in established dementia), the validation panel shows the model's over-prediction instead of hiding it. This is a teaching/hypothesis tool, **not** a validated clinical predictor or medical advice.
 
 ## Files
-- `index.html`, `styles.css`, `app.js` — the app (only dependency: Three.js via CDN)
-- `research/` — the two source papers
+- `index.html`, `styles.css`, `app.js` — the app (only dependency: Three.js, vendored in `vendor/`)
+- `brain_structure.js`, `apoe_structure.js` — real anatomy (FreeSurfer fsaverage + MNI152) and the PDB 2L7B ApoE backbone
+- `research/` — the two source papers, `literature.csv` (evidence base), `build_benchmarks.py`
+- `benchmarks.json` — generated from the CSV; do not edit by hand
 - `graphify-out/` — knowledge graph of the research (if generated)
